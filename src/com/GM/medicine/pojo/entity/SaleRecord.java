@@ -7,13 +7,13 @@ import java.time.LocalDateTime;
 
 public class SaleRecord {
 
-    private Long id;
+    private Integer id;
 
-    private Long medicineId; 
+    private Integer medicineId; 
 
-    private Long customerId; 
+    private Integer customerId; 
 
-    private Long operatorId; // 操作员编号
+    private Integer operatorId; // 操作员编号
 
     private Integer quantity; // 销售数量
 
@@ -29,35 +29,35 @@ public class SaleRecord {
 
     private LocalDateTime updatedTime;
 
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 
-    public Long getMedicineId() {
+    public Integer getMedicineId() {
         return medicineId;
     }
 
-    public void setMedicineId(Long medicineId) {
+    public void setMedicineId(Integer medicineId) {
         this.medicineId = medicineId;
     }
 
-    public Long getCustomerId() {
+    public Integer getCustomerId() {
         return customerId;
     }
 
-    public void setCustomerId(Long customerId) {
+    public void setCustomerId(Integer customerId) {
         this.customerId = customerId;
     }
 
-    public Long getOperatorId() {
+    public Integer getOperatorId() {
         return operatorId;
     }
 
-    public void setOperatorId(Long operatorId) {
+    public void setOperatorId(Integer operatorId) {
         this.operatorId = operatorId;
     }
 

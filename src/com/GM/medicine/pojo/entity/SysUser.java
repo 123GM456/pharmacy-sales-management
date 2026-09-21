@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 
 public class SysUser {
 
-    private Long id;
+    private Integer id;
 
     private String userName; 
 
@@ -15,7 +15,7 @@ public class SysUser {
 
     private String phone;
 
-    private String role; // 角色
+    private Integer role; // 角色
 
     private Integer status;
 
@@ -23,11 +23,11 @@ public class SysUser {
 
     private LocalDateTime updatedTime;
 
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 
@@ -63,11 +63,11 @@ public class SysUser {
         this.phone = phone;
     }
 
-    public String getRole() {
+    public Integer getRole() {
         return role;
     }
 
-    public void setRole(String role) {
+    public void setRole(Integer role) {
         this.role = role;
     }
 

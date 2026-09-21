@@ -24,10 +24,10 @@ DROP TABLE IF EXISTS sys_user;
 CREATE TABLE sys_user (
     id          INT          NOT NULL AUTO_INCREMENT     COMMENT '用户编号',
     username    VARCHAR(50)  NOT NULL                    COMMENT '登录用户名',
-    password    VARCHAR(100) NOT NULL                    COMMENT '登录密码',
+    password    VARCHAR(100) DEFAULT '123456'            COMMENT '登录密码',
     real_name   VARCHAR(50)  NOT NULL                    COMMENT '用户真实姓名',
     phone       VARCHAR(20)  NOT NULL                    COMMENT '用户手机号',
-    role        VARCHAR(20)  NOT NULL                    COMMENT '用户角色',
+    role        TINYINT      DEFAULT 0                   COMMENT '用户角色:1管理员，0普通用户',
     status      TINYINT      DEFAULT 1                   COMMENT '用户状态：1启用，0禁用',
     created_time DATETIME     DEFAULT CURRENT_TIMESTAMP   COMMENT '创建时间',
     updated_time DATETIME     DEFAULT CURRENT_TIMESTAMP   COMMENT '修改时间',
@@ -42,15 +42,15 @@ CREATE TABLE medicine (
     id              INT           NOT NULL AUTO_INCREMENT   COMMENT '药品编号',
     name            VARCHAR(100)  NOT NULL                  COMMENT '药品名称',
     category        VARCHAR(50)   NOT NULL                  COMMENT '药品类别',
-    specification   VARCHAR(100)                            COMMENT '药品规格',
-    manufacturer    VARCHAR(100)                            COMMENT '生产厂家',
-    batch_number    VARCHAR(50)                             COMMENT '生产批号',
-    purchase_price  DECIMAL(10,2)                           COMMENT '进货价格',
+    specification   VARCHAR(100)  NOT NULL                  COMMENT '药品规格',
+    manufacturer    VARCHAR(100)  NOT NULL                  COMMENT '生产厂家',
+    batch_number    VARCHAR(50)   NOT NULL                  COMMENT '生产批号',
+    purchase_price  DECIMAL(10,2) NOT NULL                  COMMENT '进货价格',
     sale_price      DECIMAL(10,2) NOT NULL                  COMMENT '销售价格',
     stock           INT           NOT NULL DEFAULT 0        COMMENT '当前库存',
     warning_stock   INT           NOT NULL DEFAULT 10       COMMENT '库存预警值',
-    production_date DATE                                    COMMENT '生产日期',
-    expiry_date     DATE                                    COMMENT '有效期',
+    production_date DATE          NOT NULL                  COMMENT '生产日期',
+    expiry_date     DATE          NOT NULL                  COMMENT '有效期',
     status          TINYINT       DEFAULT 1                 COMMENT '药品状态：1在售，0停用',
     created_time    DATETIME      DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_time    DATETIME      DEFAULT CURRENT_TIMESTAMP COMMENT '修改时间',
@@ -66,7 +66,7 @@ CREATE TABLE customer (
     id          INT          NOT NULL AUTO_INCREMENT     COMMENT '客户编号',
     name        VARCHAR(50)  NOT NULL                    COMMENT '客户姓名',
     sex         INT          NOT NULL DEFAULT 0          COMMENT '性别：1男，0女',
-    phone       VARCHAR(20)                              COMMENT '联系电话',
+    phone       VARCHAR(20)  NOT NULL                    COMMENT '联系电话',
     address     VARCHAR(200)                             COMMENT '联系地址',
     remark      VARCHAR(255)                             COMMENT '备注',
     created_time DATETIME     DEFAULT CURRENT_TIMESTAMP   COMMENT '创建时间',
@@ -81,7 +81,7 @@ CREATE TABLE customer (
 CREATE TABLE sale_record (
     id           INT           NOT NULL AUTO_INCREMENT     COMMENT '销售记录编号',
     medicine_id  INT           NOT NULL                    COMMENT '药品编号',
-    customer_id  INT                                       COMMENT '客户编号',
+    customer_id  INT           NOT NULL                    COMMENT '客户编号',
     operator_id  INT           NOT NULL                    COMMENT '操作员编号',
     quantity     INT           NOT NULL                    COMMENT '销售数量',
     unit_price   DECIMAL(10,2) NOT NULL                    COMMENT '销售单价',
@@ -104,8 +104,8 @@ CREATE TABLE sale_record (
 -- 初始化测试数据
 -- =============================================================
 INSERT INTO sys_user (username, password, real_name, phone, role, status) VALUES
-('admin',   'admin123', '系统管理员', '13800138001', 'ADMIN',   1),
-('cashier', '123456',   '张小明',    '13900139002', 'CASHIER', 1);
+('admin',   'admin123', '系统管理员', '13800138001', 1,   1),
+('cashier', '123456',   '张小明',    '13900139002', 0, 1);
 
 INSERT INTO medicine
     (name, category, specification, manufacturer, batch_number, purchase_price, sale_price,
