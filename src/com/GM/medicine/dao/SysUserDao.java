@@ -28,16 +28,17 @@ public class SysUserDao implements BaseDao<SysUser> {
 
     /**
      * 新增一个用户
-     * - password、role、status 不写入，全部使用数据库默认值（123456 / 0 / 1）
+     * - password 由 Service 层完成 BCrypt 哈希后传入，本方法原样入库，不做任何密码处理
+     * - role、status 不写入，使用数据库默认值
      *
      * @param sysUser 待保存的用户对象，id 由数据库自增生成，无需设置
      * @return 插入成功返回 true，失败返回 false
      */
     @Override
     public boolean add(SysUser sysUser) {
-        // 只写入业务字段，id 交给自增主键，password、role、status 交给数据库默认值，时间字段交给数据库默认值
-        String sql = "INSERT INTO sys_user (username, real_name, phone)"
-                + " VALUES (?, ?, ?)";
+        // 只写入业务字段，id 交给自增主键，role、status 交给数据库默认值，时间字段交给数据库默认值
+        String sql = "INSERT INTO sys_user (username, password, real_name, phone)"
+                + " VALUES (?, ?, ?, ?)";
         Connection conn = null;
         PreparedStatement stmt = null;
         try {
@@ -45,8 +46,9 @@ public class SysUserDao implements BaseDao<SysUser> {
             stmt = conn.prepareStatement(sql);
             // 占位符下标从 1 开始，绑定顺序必须与 SQL 中的书写顺序一致
             stmt.setString(1, sysUser.getUserName());
-            stmt.setString(2, sysUser.getRealName());
-            stmt.setString(3, sysUser.getPhone());
+            stmt.setString(2, sysUser.getPassword());
+            stmt.setString(3, sysUser.getRealName());
+            stmt.setString(4, sysUser.getPhone());
             // executeUpdate 返回受影响行数，大于 0 说明插入成功
             return stmt.executeUpdate() > 0;
         } catch (SQLException e) {

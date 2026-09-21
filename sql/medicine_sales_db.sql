@@ -24,7 +24,7 @@ DROP TABLE IF EXISTS sys_user;
 CREATE TABLE sys_user (
     id          INT          NOT NULL AUTO_INCREMENT     COMMENT '用户编号',
     username    VARCHAR(50)  NOT NULL                    COMMENT '登录用户名',
-    password    VARCHAR(100) DEFAULT '123456'            COMMENT '登录密码',
+    password    VARCHAR(100) DEFAULT '$2a$10$59uS1fa.A4LG6owMnvD02ehzgPlG0BEPxhonfI.L6Fx3R168LMzka' COMMENT '登录密码（BCrypt哈希）',
     real_name   VARCHAR(50)  NOT NULL                    COMMENT '用户真实姓名',
     phone       VARCHAR(20)  NOT NULL                    COMMENT '用户手机号',
     role        TINYINT      DEFAULT 0                   COMMENT '用户角色:1管理员，0普通用户',
@@ -103,9 +103,10 @@ CREATE TABLE sale_record (
 -- =============================================================
 -- 初始化测试数据
 -- =============================================================
+-- password 列存放 BCrypt 哈希串：admin 对应明文 admin123，cashier 对应明文 123456
 INSERT INTO sys_user (username, password, real_name, phone, role, status) VALUES
-('admin',   'admin123', '系统管理员', '13800138001', 1,   1),
-('cashier', '123456',   '张小明',    '13900139002', 0, 1);
+('admin',   '$2a$10$6bONxgpAYyL2dQDJVXcA8ecnwQ8nk6xKwhB6yytzp3yoYUOg25L1a', '系统管理员', '13800138001', 1, 1),
+('cashier', '$2a$10$59uS1fa.A4LG6owMnvD02ehzgPlG0BEPxhonfI.L6Fx3R168LMzka', '张小明',    '13900139002', 0, 1);
 
 INSERT INTO medicine
     (name, category, specification, manufacturer, batch_number, purchase_price, sale_price,

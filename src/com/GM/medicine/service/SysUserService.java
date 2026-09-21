@@ -1,5 +1,7 @@
 package com.GM.medicine.service;
 
+// 导入 BCrypt：jBCrypt 库提供的成熟哈希算法，用于密码加密存储与验证
+import org.mindrot.jbcrypt.BCrypt;
 // 导入 ArrayList：无权限时返回空集合的实例化类型
 import java.util.ArrayList;
 // 导入 List：findAll 方法返回的用户集合类型
@@ -24,6 +26,9 @@ public class SysUserService {
     // 普通用户角色值
     public static final int ROLE_STAFF = 0;
 
+    // 新增用户的初始明文密码，入库前统一经 BCrypt 哈希
+    private static final String DEFAULT_PASSWORD = "123456";
+
     // 数据访问对象，负责真正读写数据库，业务规则校验通过后才调用它
     private SysUserDao sysUserDao = new SysUserDao();
 
@@ -46,8 +51,8 @@ public class SysUserService {
             System.out.println("登录失败：用户名不存在");
             return null;
         }
-        // 密码用 equals 精确比较，任何一个字符不同都视为密码错误
-        if (!sysUser.getPassword().equals(password)) {
+        // 用 BCrypt 验证明文密码与库中哈希是否匹配，禁止用 equals 直接比较
+        if (!verifyPassword(password, sysUser.getPassword())) {
             System.out.println("登录失败：密码错误");
             return null;
         }
@@ -96,8 +101,8 @@ public class SysUserService {
             System.out.println("修改个人信息失败：当前用户未登录");
             return false;
         }
-        if (updateInfo == null) {
-            System.out.println("修改个人信息失败：修改数据为空");
+        if (updateInfo == null || updateInfo.getId() == null) {
+            System.out.println("修改个人信息失败：修改数据或用户 ID 不能为空"); 
             return false;
         }
         if (updateInfo.getRealName() == null || updateInfo.getRealName().isEmpty()) {
@@ -145,8 +150,8 @@ public class SysUserService {
             System.out.println("修改密码失败：当前账号已不存在");
             return false;
         }
-        // 旧密码错误说明不是本人在操作，直接拒绝
-        if (passwordDTO.getOldPassword() == null || !sysUser.getPassword().equals(passwordDTO.getOldPassword())) {
+        // 旧密码错误说明不是本人在操作，直接拒绝；用 BCrypt 比对，不做明文比较
+        if (!verifyPassword(passwordDTO.getOldPassword(), sysUser.getPassword())) {
             System.out.println("修改密码失败：旧密码错误");
             return false;
         }
@@ -154,12 +159,13 @@ public class SysUserService {
             System.out.println("修改密码失败：新密码为空");
             return false;
         }
-        // 新旧密码相同等于没改，视为无效请求
-        if (passwordDTO.getNewPassword().equals(sysUser.getPassword())) {
+        // 新旧密码相同等于没改，视为无效请求；BCrypt 每次加盐不同，只能用 matches 判断
+        if (verifyPassword(passwordDTO.getNewPassword(), sysUser.getPassword())) {
             System.out.println("修改密码失败：新密码与旧密码相同");
             return false;
         }
-        boolean result = sysUserDao.updatePassword(sysUser.getId(), passwordDTO.getNewPassword());
+        // 明文新密码先哈希再入库，控制台与数据库都不出现明文
+        boolean result = sysUserDao.updatePassword(sysUser.getId(), hashPassword(passwordDTO.getNewPassword()));
         if (result) {
             System.out.println("修改密码成功：用户 " + sysUser.getUserName());
         } else {
@@ -215,7 +221,7 @@ public class SysUserService {
 
     /**
      * 管理员新增用户
-     * - 密码、角色、状态不写入，统一使用数据库默认值（123456 / 普通用户 / 启用）
+     * - 角色、状态使用数据库默认值；初始密码由本方法生成并哈希后交给 DAO 保存
      *
      * @param currentUser 当前登录用户
      * @param sysUser     待新增的用户对象，只需提供用户名、真实姓名、手机号
@@ -226,8 +232,12 @@ public class SysUserService {
             System.out.println("新增用户失败：没有管理员权限");
             return false;
         }
+        if (sysUser == null) {
+            System.out.println("新增用户失败：用户对象不能为空");
+            return false;
+        }
         // 检查非空字段是否为空
-        if (sysUser == null || sysUser.getUserName() == null || sysUser.getUserName().isEmpty()) {
+        if (sysUser.getUserName() == null || sysUser.getUserName().isEmpty()) {
             System.out.println("新增用户失败：用户名为空");
             return false;
         }
@@ -244,6 +254,8 @@ public class SysUserService {
             System.out.println("新增用户失败：用户名已存在");
             return false;
         }
+        // 初始密码在 Service 层完成 BCrypt 哈希，DAO 只负责原样入库
+        sysUser.setPassword(hashPassword(DEFAULT_PASSWORD));
         boolean result = sysUserDao.add(sysUser);
         if (result) {
             System.out.println("新增用户成功：" + sysUser.getUserName());
@@ -315,7 +327,8 @@ public class SysUserService {
             System.out.println("重置密码失败：用户不存在");
             return false;
         }
-        boolean result = sysUserDao.updatePassword(targetId, newPassword);
+        // 新密码同样先哈希再入库，不输出明文
+        boolean result = sysUserDao.updatePassword(targetId, hashPassword(newPassword));
         if (result) {
             System.out.println("重置密码成功：用户 " + target.getUserName());
         } else {
@@ -333,6 +346,32 @@ public class SysUserService {
     private boolean isAdmin(SysUser currentUser) {
         return currentUser != null && currentUser.getRole() != null
                 && currentUser.getRole() == ROLE_ADMIN;
+    }
+
+    /**
+     * 把明文密码转换为 BCrypt 哈希串
+     * - BCrypt 自动生成随机盐，同一明文每次哈希结果不同，属正常现象
+     *
+     * @param rawPassword 明文密码
+     * @return 可入库保存的哈希串
+     */
+    private String hashPassword(String rawPassword) {
+        return BCrypt.hashpw(rawPassword, BCrypt.gensalt());
+    }
+
+    /**
+     * 验证明文密码与库中哈希是否匹配
+     * - 待验证值为 null 时不可能匹配，先行拦截避免 BCrypt 抛空指针
+     *
+     * @param rawPassword    用户输入的明文密码
+     * @param hashedPassword 数据库中保存的 BCrypt 哈希串
+     * @return 匹配返回 true，任一为空或不匹配返回 false
+     */
+    private boolean verifyPassword(String rawPassword, String hashedPassword) {
+        if (rawPassword == null || hashedPassword == null) {
+            return false;
+        }
+        return BCrypt.checkpw(rawPassword, hashedPassword);
     }
 
 }

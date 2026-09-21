@@ -6,5 +6,5 @@ package com.GM.medicine.service;
  * - 介于界面层与 SaleRecordDao 之间，界面层不直接访问 DAO
  */
 public class SaleRecordService {
-
+    
 }

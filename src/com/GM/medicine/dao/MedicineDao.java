@@ -207,6 +207,13 @@ public class MedicineDao implements BaseDao<Medicine> {
         return medicineList;
     }
 
+    /**
+     * 把 ResultSet 转成 Medicine 实体
+     *
+     * @param rs 包含药品数据的 ResultSet
+     * @return 对应的 Medicine 实体
+     * @throws SQLException 如果 ResultSet 操作失败
+     */
     private Medicine mapRow(ResultSet rs) throws SQLException {
         Medicine medicine = new Medicine();
         medicine.setId(rs.getInt("id"));
@@ -247,5 +254,98 @@ public class MedicineDao implements BaseDao<Medicine> {
         }
         // Connector/J 对 setObject 直传 LocalDate 兼容性不稳定，显式转成 java.sql.Date 最可靠
         return Date.valueOf(date);
+    }
+
+    /**
+     * 查询所有可用药品
+     * - 可用需同时满足：状态正常、库存大于 0、未过期
+     *
+     * @return 所有可用药品的列表
+     */
+    public List<Medicine> findAvailableMedicines() {
+        String sql = "SELECT id, name, category, specification, manufacturer, batch_number, purchase_price,"
+                + " sale_price, stock, warning_stock, production_date, expiry_date, status,"
+                + " created_time, updated_time FROM medicine"
+                + " WHERE status = 1 AND stock > 0 AND expiry_date > CURDATE() ORDER BY id";
+        List<Medicine> availableMedicines = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            stmt = conn.prepareStatement(sql);
+            rs = stmt.executeQuery();
+            // 结果集可能有多行，逐行转换后加入集合
+            while (rs.next()) {
+                availableMedicines.add(mapRow(rs));
+            }
+        } catch (SQLException e) {
+            System.err.println("查询所有可用药品失败：" + e.getMessage());
+        } finally {
+            DBUtil.close(conn, stmt, rs);
+        }
+        return availableMedicines;
+    }
+
+    /**
+     * 查询所有预警药品
+     * - 预警需同时满足：状态正常、库存大于 0、未过期、库存低于预警值
+     *
+     * @return 所有预警药品的列表
+     */
+    public List<Medicine> findWarningMedicines() {
+        String sql = "SELECT id, name, category, specification, manufacturer, batch_number, purchase_price,"
+                + " sale_price, stock, warning_stock, production_date, expiry_date, status,"
+                + " created_time, updated_time FROM medicine"
+                + " WHERE status = 1 AND stock > 0 AND stock <= warning_stock AND expiry_date > CURDATE() ORDER BY id";
+        List<Medicine> warningMedicines = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            stmt = conn.prepareStatement(sql);
+            rs = stmt.executeQuery();
+            // 结果集可能有多行，逐行转换后加入集合
+            while (rs.next()) {
+                warningMedicines.add(mapRow(rs));
+            }
+        } catch (SQLException e) {
+            System.err.println("查询所有预警药品失败：" + e.getMessage());
+        } finally {
+            DBUtil.close(conn, stmt, rs);
+        }
+        return warningMedicines;
+    }
+
+    /**
+     * 查询所有过期药品
+     * - 过期需同时满足：状态正常、库存大于 0、已过期
+     *
+     * @return 所有过期药品的列表
+     */
+    public List<Medicine> findExpiredMedicines() {
+        String sql = "SELECT id, name, category, specification, manufacturer, batch_number, purchase_price,"
+                + " sale_price, stock, warning_stock, production_date, expiry_date, status,"
+                + " created_time, updated_time FROM medicine"
+                + " WHERE status = 1 AND stock > 0 AND expiry_date < CURDATE() ORDER BY id";
+        List<Medicine> expiredMedicines = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            stmt = conn.prepareStatement(sql);
+            rs = stmt.executeQuery();
+            // 结果集可能有多行，逐行转换后加入集合
+            while (rs.next()) {
+                expiredMedicines.add(mapRow(rs));
+            }
+        } catch (SQLException e) {
+            System.err.println("查询所有过期药品失败：" + e.getMessage());
+        } finally {
+            DBUtil.close(conn, stmt, rs);
+        }
+        return expiredMedicines;
     }
 }
