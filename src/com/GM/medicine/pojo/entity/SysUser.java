@@ -5,6 +5,18 @@ import java.time.LocalDateTime;
 
 public class SysUser {
 
+    // 管理员角色值，与数据库 role 列的注释保持一致
+    public static final int ROLE_ADMIN = 1;
+
+    // 普通用户角色值
+    public static final int ROLE_STAFF = 0;
+
+    // 启用状态值，与数据库 status 列的注释保持一致
+    public static final int STATUS_ENABLED = 1;
+
+    // 禁用状态值
+    public static final int STATUS_DISABLED = 0;
+
     private Integer id;
 
     private String userName; 

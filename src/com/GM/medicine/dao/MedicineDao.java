@@ -20,7 +20,6 @@ import java.util.List;
 import java.time.LocalDate;
 // 导入 DBUtil：负责提供数据库连接与释放 JDBC 资源
 import com.GM.medicine.common.util.DBUtil;
-import com.GM.medicine.pojo.entity.Customer;
 // 导入 Medicine：本 DAO 负责持久化的实体类型
 import com.GM.medicine.pojo.entity.Medicine;
 
@@ -82,7 +81,7 @@ public class MedicineDao implements BaseDao<Medicine> {
      * @param id 待删除的药品 id
      * @return 删除成功返回 true，id 为空时返回 false
      */
-    @Override 
+    @Override
     public boolean delete(Integer id) {
         // 没有主键就无法定位记录，直接返回失败，避免误删全表
         if (id == null) {
@@ -167,7 +166,7 @@ public class MedicineDao implements BaseDao<Medicine> {
             if (rs.next()) {
                 return mapRow(rs);
             }
-            return null;    
+            return null;
         } catch (SQLException e) {
             System.err.println("查询药品失败：" + e.getMessage());
             return null;
@@ -205,40 +204,6 @@ public class MedicineDao implements BaseDao<Medicine> {
             DBUtil.close(conn, stmt, rs);
         }
         return medicineList;
-    }
-
-    /**
-     * 把 ResultSet 转成 Medicine 实体
-     *
-     * @param rs 包含药品数据的 ResultSet
-     * @return 对应的 Medicine 实体
-     * @throws SQLException 如果 ResultSet 操作失败
-     */
-    private Medicine mapRow(ResultSet rs) throws SQLException {
-        Medicine medicine = new Medicine();
-        medicine.setId(rs.getInt("id"));
-        medicine.setName(rs.getString("name"));
-        medicine.setCategory(rs.getString("category"));
-        medicine.setSpecification(rs.getString("specification"));
-        medicine.setManufacturer(rs.getString("manufacturer"));
-        medicine.setBatchNumber(rs.getString("batch_number"));
-        medicine.setPurchasePrice(rs.getBigDecimal("purchase_price"));
-        medicine.setSalePrice(rs.getBigDecimal("sale_price"));
-        medicine.setStock(rs.getInt("stock"));
-        medicine.setWarningStock(rs.getInt("warning_stock"));
-        medicine.setProductionDate(rs.getDate("production_date").toLocalDate());
-        medicine.setExpiryDate(rs.getDate("expiry_date").toLocalDate());
-        medicine.setStatus(rs.getInt("status"));
-        // DATETIME 列取出来是 Timestamp，需要转成实体使用的 LocalDateTime；列允许为空，先判空再转换
-        Timestamp createdTime = rs.getTimestamp("created_time");
-        if (createdTime != null) {
-            medicine.setCreatedTime(createdTime.toLocalDateTime());
-        }
-        Timestamp updatedTime = rs.getTimestamp("updated_time");
-        if (updatedTime != null) {
-            medicine.setUpdatedTime(updatedTime.toLocalDateTime());
-        }
-        return medicine;
     }
 
     /**
@@ -347,5 +312,39 @@ public class MedicineDao implements BaseDao<Medicine> {
             DBUtil.close(conn, stmt, rs);
         }
         return expiredMedicines;
+    }
+
+    /**
+     * 把 ResultSet 转成 Medicine 实体
+     *
+     * @param rs 包含药品数据的 ResultSet
+     * @return 对应的 Medicine 实体
+     * @throws SQLException 如果 ResultSet 操作失败
+     */
+    private Medicine mapRow(ResultSet rs) throws SQLException {
+        Medicine medicine = new Medicine();
+        medicine.setId(rs.getInt("id"));
+        medicine.setName(rs.getString("name"));
+        medicine.setCategory(rs.getString("category"));
+        medicine.setSpecification(rs.getString("specification"));
+        medicine.setManufacturer(rs.getString("manufacturer"));
+        medicine.setBatchNumber(rs.getString("batch_number"));
+        medicine.setPurchasePrice(rs.getBigDecimal("purchase_price"));
+        medicine.setSalePrice(rs.getBigDecimal("sale_price"));
+        medicine.setStock(rs.getInt("stock"));
+        medicine.setWarningStock(rs.getInt("warning_stock"));
+        medicine.setProductionDate(rs.getDate("production_date").toLocalDate());
+        medicine.setExpiryDate(rs.getDate("expiry_date").toLocalDate());
+        medicine.setStatus(rs.getInt("status"));
+        // DATETIME 列取出来是 Timestamp，需要转成实体使用的 LocalDateTime；列允许为空，先判空再转换
+        Timestamp createdTime = rs.getTimestamp("created_time");
+        if (createdTime != null) {
+            medicine.setCreatedTime(createdTime.toLocalDateTime());
+        }
+        Timestamp updatedTime = rs.getTimestamp("updated_time");
+        if (updatedTime != null) {
+            medicine.setUpdatedTime(updatedTime.toLocalDateTime());
+        }
+        return medicine;
     }
 }

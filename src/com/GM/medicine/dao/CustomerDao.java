@@ -182,6 +182,74 @@ public class CustomerDao implements BaseDao<Customer> {
     }
 
     /**
+     * 根据手机号查询客户
+     * @param phone 客户联系电话
+     * @return 查询到的客户对象，手机号为空或没有匹配记录时返回 null
+     */
+    public Customer findByPhone(String phone) {
+        // 手机号为空时不可能命中任何记录，直接返回 null，省一次数据库访问
+        if (phone == null || phone.isEmpty()) {
+            return null;
+        }
+        String sql = "SELECT id, name, sex, phone, address, remark, created_time, updated_time"
+                + " FROM customer WHERE phone = ?";
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            stmt = conn.prepareStatement(sql);
+            stmt.setString(1, phone);
+            rs = stmt.executeQuery();
+            // phone 上只是普通索引，数据库不会拦重复，取第一条就足以判断是否已存在
+            if (rs.next()) {
+                return mapRow(rs);
+            }
+            return null;
+        } catch (SQLException e) {
+            System.err.println("按手机号查询客户失败：" + e.getMessage());
+            return null;
+        } finally {
+            DBUtil.close(conn, stmt, rs);
+        }
+    }
+
+    /**
+     * 根据姓名模糊查询客户，允许只输入姓名中的一部分
+     *
+     * @param name 客户姓名关键字
+     * @return 匹配到的客户列表，关键字为空或没有匹配记录时返回空集合
+     */
+    public List<Customer> findByNameLike(String name) {
+        // 关键字为空时若不加条件会把全表查出来，直接返回空集合更符合查询语义
+        if (name == null || name.isEmpty()) {
+            return new ArrayList<>();
+        }
+        // 通配符 % 拼在 SQL 里，关键字本身仍走占位符，避免拼接字符串带来的注入风险
+        String sql = "SELECT id, name, sex, phone, address, remark, created_time, updated_time"
+                + " FROM customer WHERE name LIKE CONCAT('%', ?, '%') ORDER BY id";
+        List<Customer> customerList = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            stmt = conn.prepareStatement(sql);
+            stmt.setString(1, name);
+            rs = stmt.executeQuery();
+            // 结果集可能有多行，逐行转换后加入集合
+            while (rs.next()) {
+                customerList.add(mapRow(rs));
+            }
+        } catch (SQLException e) {
+            System.err.println("按姓名模糊查询客户失败：" + e.getMessage());
+        } finally {
+            DBUtil.close(conn, stmt, rs);
+        }
+        return customerList;
+    }
+
+    /**
      * 把结果集当前行转换为客户对象
      *
      * @param rs 指向当前行的结果集

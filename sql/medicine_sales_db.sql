@@ -24,7 +24,7 @@ DROP TABLE IF EXISTS sys_user;
 CREATE TABLE sys_user (
     id          INT          NOT NULL AUTO_INCREMENT     COMMENT '用户编号',
     username    VARCHAR(50)  NOT NULL                    COMMENT '登录用户名',
-    password    VARCHAR(100) DEFAULT '$2a$10$59uS1fa.A4LG6owMnvD02ehzgPlG0BEPxhonfI.L6Fx3R168LMzka' COMMENT '登录密码（BCrypt哈希）',
+    password    VARCHAR(100) NOT NULL                    COMMENT '登录密码（BCrypt哈希）',
     real_name   VARCHAR(50)  NOT NULL                    COMMENT '用户真实姓名',
     phone       VARCHAR(20)  NOT NULL                    COMMENT '用户手机号',
     role        TINYINT      DEFAULT 0                   COMMENT '用户角色:1管理员，0普通用户',

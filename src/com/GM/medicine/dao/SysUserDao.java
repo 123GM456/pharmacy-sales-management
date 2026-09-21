@@ -113,6 +113,7 @@ public class SysUserDao implements BaseDao<SysUser> {
         } catch (SQLException e) {
             System.err.println("更新用户失败：" + e.getMessage());
             return false;
+            // executeUpdate 返回受影响行数，大于 0 说明更新成功
         } finally {
             DBUtil.close(conn, stmt);
         }

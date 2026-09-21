@@ -21,11 +21,6 @@ import com.GM.medicine.pojo.entity.SysUser;
  */
 public class SysUserService {
 
-    // 管理员角色值，与数据库 role 列的注释保持一致
-    public static final int ROLE_ADMIN = 1;
-    // 普通用户角色值
-    public static final int ROLE_STAFF = 0;
-
     // 新增用户的初始明文密码，入库前统一经 BCrypt 哈希
     private static final String DEFAULT_PASSWORD = "123456";
 
@@ -57,7 +52,7 @@ public class SysUserService {
             return null;
         }
         // status 为 1 表示启用，其他值（含 0 禁用）一律拒绝登录
-        if (sysUser.getStatus() == null || sysUser.getStatus() != 1) {
+        if (sysUser.getStatus() == null || sysUser.getStatus() != SysUser.STATUS_ENABLED) {
             System.out.println("登录失败：账号已被禁用");
             return null;
         }
@@ -344,8 +339,17 @@ public class SysUserService {
      * @return 是管理员返回 true，用户为空或角色不是管理员返回 false
      */
     private boolean isAdmin(SysUser currentUser) {
-        return currentUser != null && currentUser.getRole() != null
-                && currentUser.getRole() == ROLE_ADMIN;
+        if (currentUser == null || currentUser.getRole() == null) {
+            System.out.println("用户为空或角色为空");
+            return false;
+        }
+        if (currentUser.getRole() == SysUser.ROLE_ADMIN) {
+            System.out.println("用户是管理员");
+            return true;
+        }
+        System.out.println("用户不是管理员");
+            return false;   
+    
     }
 
     /**
