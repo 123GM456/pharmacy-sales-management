@@ -134,7 +134,7 @@ public class SaleRecordDao implements BaseDao<SaleRecord> {
     @Override
     public SaleRecord findById(Integer id) {
         String sql = "SELECT id, medicine_id, operator_id, quantity, unit_price, total_amount,"
-                + " sale_time, remark, created_time, updated_time FROM sale_record WHERE id = ?";
+                + " sale_time, remark FROM sale_record WHERE id = ?";
         Connection conn = null;
         PreparedStatement stmt = null;
         ResultSet rs = null;
@@ -165,7 +165,7 @@ public class SaleRecordDao implements BaseDao<SaleRecord> {
     public List<SaleRecord> findAll() {
         // 按 id 排序，保证多次查询得到的顺序稳定
         String sql = "SELECT id, medicine_id, operator_id, quantity, unit_price, total_amount,"
-                + " sale_time, remark, created_time, updated_time FROM sale_record ORDER BY id";
+                + " sale_time, remark FROM sale_record ORDER BY id";
         List<SaleRecord> saleRecordList = new ArrayList<>();
         Connection conn = null;
         PreparedStatement stmt = null;

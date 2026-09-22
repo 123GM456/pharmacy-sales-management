@@ -70,8 +70,6 @@ CREATE TABLE sale_record (
     total_amount DECIMAL(12,2) NOT NULL                    COMMENT '销售总金额',
     sale_time    DATETIME      NOT NULL                    COMMENT '销售时间',
     remark       VARCHAR(255)                              COMMENT '备注',
-    created_time   DATETIME      DEFAULT CURRENT_TIMESTAMP   COMMENT '创建时间',
-    updated_time   DATETIME      DEFAULT CURRENT_TIMESTAMP   COMMENT '修改时间',
     PRIMARY KEY (id),
     KEY idx_sale_medicine (medicine_id),
     KEY idx_sale_operator (operator_id),
