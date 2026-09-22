@@ -11,8 +11,6 @@ public class SaleRecord {
 
     private Integer medicineId; 
 
-    private Integer customerId; 
-
     private Integer operatorId; // 操作员编号
 
     private Integer quantity; // 销售数量
@@ -43,14 +41,6 @@ public class SaleRecord {
 
     public void setMedicineId(Integer medicineId) {
         this.medicineId = medicineId;
-    }
-
-    public Integer getCustomerId() {
-        return customerId;
-    }
-
-    public void setCustomerId(Integer customerId) {
-        this.customerId = customerId;
     }
 
     public Integer getOperatorId() {

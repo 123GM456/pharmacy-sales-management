@@ -37,8 +37,8 @@ public class SaleRecordDao implements BaseDao<SaleRecord> {
     @Override
     public boolean add(SaleRecord saleRecord) {
         // 只写入业务字段，id 交给自增主键，时间字段交给数据库默认值
-        String sql = "INSERT INTO sale_record (medicine_id, customer_id, operator_id, quantity, unit_price,"
-                + " total_amount, sale_time, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO sale_record (medicine_id, operator_id, quantity, unit_price,"
+                + " total_amount, sale_time, remark) VALUES (?, ?, ?, ?, ?, ?, ?)";
         Connection conn = null;
         PreparedStatement stmt = null;
         try {
@@ -47,14 +47,12 @@ public class SaleRecordDao implements BaseDao<SaleRecord> {
             // 外键、数量、金额、销售时间这些列都没有数据库默认值，用 setObject 绑定：
             // 调用方漏填时由数据库约束直接报错，而不是在这里补一个 0 造成无效的销售记录
             stmt.setInt(1, saleRecord.getMedicineId());
-            // customer_id 是唯一允许为空的外键，散客购买时可以不填
-            stmt.setInt(2, saleRecord.getCustomerId());
-            stmt.setInt(3, saleRecord.getOperatorId());
-            stmt.setInt(4, saleRecord.getQuantity());
-            stmt.setBigDecimal(5, saleRecord.getUnitPrice());
-            stmt.setBigDecimal(6, saleRecord.getTotalAmount());
-            stmt.setTimestamp(7, toTimestamp(saleRecord.getSaleTime()));
-            stmt.setString(8, saleRecord.getRemark());
+            stmt.setInt(2, saleRecord.getOperatorId());
+            stmt.setInt(3, saleRecord.getQuantity());
+            stmt.setBigDecimal(4, saleRecord.getUnitPrice());
+            stmt.setBigDecimal(5, saleRecord.getTotalAmount());
+            stmt.setTimestamp(6, toTimestamp(saleRecord.getSaleTime()));
+            stmt.setString(7, saleRecord.getRemark());
             // executeUpdate 返回受影响行数，大于 0 说明插入成功
             return stmt.executeUpdate() > 0;
         } catch (SQLException e) {
@@ -103,7 +101,7 @@ public class SaleRecordDao implements BaseDao<SaleRecord> {
     @Override
     public boolean update(SaleRecord saleRecord) {
         // updated_time 列没有 ON UPDATE 属性，因此需要在此显式刷新为当前时间
-        String sql = "UPDATE sale_record SET medicine_id = ?, customer_id = ?, operator_id = ?, quantity = ?,"
+        String sql = "UPDATE sale_record SET medicine_id = ?, operator_id = ?, quantity = ?,"
                 + " unit_price = ?, total_amount = ?, sale_time = ?, remark = ?, updated_time = NOW() WHERE id = ?";
         Connection conn = null;
         PreparedStatement stmt = null;
@@ -111,14 +109,13 @@ public class SaleRecordDao implements BaseDao<SaleRecord> {
             conn = DBUtil.getConnection();
             stmt = conn.prepareStatement(sql);
             stmt.setObject(1, saleRecord.getMedicineId());
-            stmt.setObject(2, saleRecord.getCustomerId());
-            stmt.setObject(3, saleRecord.getOperatorId());
-            stmt.setObject(4, saleRecord.getQuantity());
-            stmt.setObject(5, saleRecord.getUnitPrice());
-            stmt.setObject(6, saleRecord.getTotalAmount());
-            stmt.setObject(7, toTimestamp(saleRecord.getSaleTime()));
-            stmt.setString(8, saleRecord.getRemark());
-            stmt.setObject(9, saleRecord.getId());
+            stmt.setObject(2, saleRecord.getOperatorId());
+            stmt.setObject(3, saleRecord.getQuantity());
+            stmt.setObject(4, saleRecord.getUnitPrice());
+            stmt.setObject(5, saleRecord.getTotalAmount());
+            stmt.setObject(6, toTimestamp(saleRecord.getSaleTime()));
+            stmt.setString(7, saleRecord.getRemark());
+            stmt.setObject(8, saleRecord.getId());
             return stmt.executeUpdate() > 0;
         } catch (SQLException e) {
             System.err.println("更新销售记录失败：" + e.getMessage());
@@ -136,7 +133,7 @@ public class SaleRecordDao implements BaseDao<SaleRecord> {
      */
     @Override
     public SaleRecord findById(Integer id) {
-        String sql = "SELECT id, medicine_id, customer_id, operator_id, quantity, unit_price, total_amount,"
+        String sql = "SELECT id, medicine_id, operator_id, quantity, unit_price, total_amount,"
                 + " sale_time, remark, created_time, updated_time FROM sale_record WHERE id = ?";
         Connection conn = null;
         PreparedStatement stmt = null;
@@ -167,7 +164,7 @@ public class SaleRecordDao implements BaseDao<SaleRecord> {
     @Override
     public List<SaleRecord> findAll() {
         // 按 id 排序，保证多次查询得到的顺序稳定
-        String sql = "SELECT id, medicine_id, customer_id, operator_id, quantity, unit_price, total_amount,"
+        String sql = "SELECT id, medicine_id, operator_id, quantity, unit_price, total_amount,"
                 + " sale_time, remark, created_time, updated_time FROM sale_record ORDER BY id";
         List<SaleRecord> saleRecordList = new ArrayList<>();
         Connection conn = null;
@@ -200,10 +197,6 @@ public class SaleRecordDao implements BaseDao<SaleRecord> {
         SaleRecord saleRecord = new SaleRecord();
         saleRecord.setId(rs.getInt("id"));
         saleRecord.setMedicineId(rs.getInt("medicine_id"));
-        // customer_id 允许为空；getInt 遇到 NULL 会返回 0，所以先用 getObject 判断是否为空再取值
-        if (rs.getObject("customer_id") != null) {
-            saleRecord.setCustomerId(rs.getInt("customer_id"));
-        }
         saleRecord.setOperatorId(rs.getInt("operator_id"));
         saleRecord.setQuantity(rs.getInt("quantity"));
         saleRecord.setUnitPrice(rs.getBigDecimal("unit_price"));
