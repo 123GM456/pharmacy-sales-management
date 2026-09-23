@@ -161,14 +161,14 @@ public class MedicineService {
 
     public Medicine findById(Integer id) {
         if (id == null) {
-            System.out.println("查询药品失败：药品编号不能为空");
+            System.out.println("查询药品：药品编号不能为空");       
             return null;
         }   
         Medicine medicine = medicineDao.findById(id);
         if (medicine == null) {
-            System.out.println("查询药品失败：编号 " + id + " 不存在");
+            System.out.println("查询药品：编号 " + id + " 不存在");
         } else {
-            System.out.println("查询药品成功：" + medicine);
+            System.out.println("查询药品：" + medicine);
         }
         return medicine;
     }
@@ -176,9 +176,9 @@ public class MedicineService {
     public List<Medicine> findAll() {
         List<Medicine> medicines = medicineDao.findAll();
         if (medicines.isEmpty()) {
-            System.out.println("查询所有药品失败：当前没有药品数据");
+            System.out.println("查询所有药品：当前没有药品数据");
         } else {
-            System.out.println("查询所有药品成功：共 " + medicines.size() + " 条数据");
+            System.out.println("查询所有药品：共 " + medicines.size() + " 条数据");
         }
         return medicines;
     }
@@ -191,9 +191,9 @@ public class MedicineService {
     public List<Medicine> findAvailableMedicines() {
         List<Medicine> availableMedicines = medicineDao.findAvailableMedicines();
         if (availableMedicines.isEmpty()) {
-            System.out.println("查询可用药品失败：当前没有可销售药品");
+            System.out.println("查询可用药品：当前没有可销售药品");
         } else {
-            System.out.println("查询成功：共 " + availableMedicines.size() + " 条数据");
+            System.out.println("查询可用药品：共 " + availableMedicines.size() + " 条数据");
         }
         return availableMedicines;
     }
@@ -201,9 +201,9 @@ public class MedicineService {
     public List<Medicine> findWarningMedicines() {
         List<Medicine> warningMedicines = medicineDao.findWarningMedicines();
         if (warningMedicines.isEmpty()) {
-            System.out.println("查询失败：当前没有库存预警药品");
+            System.out.println("查询库存预警药品：当前没有库存预警药品");
         } else {
-            System.out.println("查询成功：共 " + warningMedicines.size() + " 条数据");
+            System.out.println("查询库存预警药品：共 " + warningMedicines.size() + " 条数据");
         }
         return warningMedicines;
     }
@@ -211,9 +211,9 @@ public class MedicineService {
     public List<Medicine> findExpiredMedicines() {
         List<Medicine> expiredMedicines = medicineDao.findExpiredMedicines();
         if (expiredMedicines.isEmpty()) {
-            System.out.println("查询失败：当前没有过期药品");
+            System.out.println("查询过期药品：当前没有过期药品");
         } else {
-            System.out.println("查询成功：共 " + expiredMedicines.size() + " 条数据");
+            System.out.println("查询过期药品：共 " + expiredMedicines.size() + " 条数据");
         }
         return expiredMedicines;
     }
@@ -229,19 +229,19 @@ public class MedicineService {
         }
         Medicine medicine = medicineDao.findById(medicineId);
         if (medicine == null) {
-            System.out.println("查询药品失败：编号 " + medicineId + " 不存在");
+            System.out.println("查询药品：编号 " + medicineId + " 不存在");
             return false;
         }
         if (medicine.getStatus() != 1) {
-            System.out.println("查询药品失败：药品状态异常");
+            System.out.println("查询药品：药品状态异常");
             return false;
         }
         if (medicine.getExpiryDate().isBefore(LocalDate.now())) {
-            System.out.println("查询药品失败：药品已过期");
+            System.out.println("查询药品：药品已过期");
             return false;
         }
         if (medicine.getStock() < quantity) {
-            System.out.println("查询药品失败：库存不足");
+            System.out.println("查询药品：库存不足");
             return false;
         }
         return true;

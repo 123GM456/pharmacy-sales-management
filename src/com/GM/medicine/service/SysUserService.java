@@ -75,9 +75,9 @@ public class SysUserService {
         // 只按当前用户自己的编号查询，不接受外部传入的编号，避免越权查看他人信息
         SysUser sysUser = sysUserDao.findById(currentUser.getId());
         if (sysUser == null) {
-            System.out.println("查询个人信息失败：当前账号已不存在");
+            System.out.println("查询个人信息：当前账号已不存在");
         } else {
-            System.out.println("查询个人信息成功：" + sysUser);
+            System.out.println("查询个人信息：" + sysUser);
         }
         return sysUser;
     }
@@ -187,9 +187,9 @@ public class SysUserService {
         }
         SysUser sysUser = sysUserDao.findById(id);
         if (sysUser == null) {
-            System.out.println("查询用户失败：编号 " + id + " 不存在");
+            System.out.println("查询用户：编号 " + id + " 不存在");
         } else {
-            System.out.println("查询用户成功：" + sysUser);
+            System.out.println("查询用户：" + sysUser);
         }
         return sysUser;
     }
@@ -207,9 +207,9 @@ public class SysUserService {
         }
         List<SysUser> sysUserList = sysUserDao.findAll();
         if (sysUserList.isEmpty()) {
-            System.out.println("查询全部用户成功：当前没有用户数据");
+            System.out.println("查询全部用户：当前没有用户数据");
         } else {
-            System.out.println("查询全部用户成功，共 " + sysUserList.size() + " 条：" + sysUserList);
+            System.out.println("查询全部用户，共 " + sysUserList.size() + " 条：" + sysUserList);
         }
         return sysUserList;
     }

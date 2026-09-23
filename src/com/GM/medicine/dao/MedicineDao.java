@@ -93,7 +93,7 @@ public class MedicineDao implements BaseDao<Medicine> {
         try {
             conn = DBUtil.getConnection();
             stmt = conn.prepareStatement(sql);
-            stmt.setObject(1, id);
+            stmt.setInt(1, id);
             return stmt.executeUpdate() > 0;
         } catch (SQLException e) {
             // 药品已被销售记录引用时，外键约束会阻止删除并抛异常
@@ -110,7 +110,6 @@ public class MedicineDao implements BaseDao<Medicine> {
      * @param medicine 携带新值并包含 id 的药品对象
      * @return 更新成功返回 true，失败返回 false
      */
-    @Override
     public boolean update(Medicine medicine) {
         // updated_time 列没有 ON UPDATE 属性，因此需要在此显式刷新为当前时间
         String sql = "UPDATE medicine SET name = ?, category = ?, specification = ?, manufacturer = ?,"
@@ -130,8 +129,8 @@ public class MedicineDao implements BaseDao<Medicine> {
             stmt.setBigDecimal(7, medicine.getSalePrice());
             stmt.setInt(8, medicine.getStock() == null ? 0 : medicine.getStock());
             stmt.setInt(9, medicine.getWarningStock() == null ? 10 : medicine.getWarningStock());
-            stmt.setObject(10, toSqlDate(medicine.getProductionDate()));
-            stmt.setObject(11, toSqlDate(medicine.getExpiryDate()));
+            stmt.setDate(10, toSqlDate(medicine.getProductionDate()));
+            stmt.setDate(11, toSqlDate(medicine.getExpiryDate()));
             stmt.setInt(12, medicine.getStatus() == null ? 1 : medicine.getStatus());
             stmt.setInt(13, medicine.getId());
             return stmt.executeUpdate() > 0;
@@ -160,7 +159,7 @@ public class MedicineDao implements BaseDao<Medicine> {
         try {
             conn = DBUtil.getConnection();
             stmt = conn.prepareStatement(sql);
-            stmt.setObject(1, id);
+            stmt.setInt(1, id);
             rs = stmt.executeQuery();
             // 主键唯一，最多只有一行，取到就转换后返回
             if (rs.next()) {
@@ -315,6 +314,24 @@ public class MedicineDao implements BaseDao<Medicine> {
     }
 
     /**
+     * 减少药品库存
+     *
+     * @param medicineId 要减少库存的药品编号
+     * @param quantity 要减少的库存数量
+     */
+    public void decreaseStock(Integer medicineId, Integer quantity) {
+        String sql = "UPDATE medicine SET stock = stock - ? WHERE id = ?";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, quantity);
+            stmt.setInt(2, medicineId);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("减少药品库存失败：" + e.getMessage());
+        }
+    }
+
+    /**
      * 把 ResultSet 转成 Medicine 实体
      *
      * @param rs 包含药品数据的 ResultSet
@@ -347,4 +364,5 @@ public class MedicineDao implements BaseDao<Medicine> {
         }
         return medicine;
     }
+
 }

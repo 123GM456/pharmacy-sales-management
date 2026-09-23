@@ -97,7 +97,6 @@ public class SysUserDao implements BaseDao<SysUser> {
      * @param sysUser 携带新值并包含 id 的用户对象
      * @return 更新成功返回 true，失败返回 false
      */
-    @Override
     public boolean update(SysUser sysUser) {
         // updated_time 列没有 ON UPDATE 属性，因此需要在此显式刷新为当前时间
         String sql = "UPDATE sys_user SET real_name = ?, phone = ?, updated_time = NOW() WHERE id = ?";

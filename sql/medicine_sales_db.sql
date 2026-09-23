@@ -13,7 +13,7 @@ CREATE DATABASE IF NOT EXISTS medicine_sales_db
 USE medicine_sales_db;
 
 -- 按外键依赖的逆序删除，保证脚本可以重复执行
-DROP TABLE IF EXISTS sale_record;
+DROP TABLE IF EXISTS sale;
 DROP TABLE IF EXISTS medicine;
 DROP TABLE IF EXISTS sys_user;
 
@@ -59,16 +59,16 @@ CREATE TABLE medicine (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '药品表';
 
 -- -------------------------------------------------------------
--- 3. sale_record 销售记录表
+-- 3. sale 销售记录表
 -- -------------------------------------------------------------
-CREATE TABLE sale_record (
+CREATE TABLE sale (
     id           INT           NOT NULL AUTO_INCREMENT     COMMENT '销售记录编号',
     medicine_id  INT           NOT NULL                    COMMENT '药品编号',
     operator_id  INT           NOT NULL                    COMMENT '操作员编号',
     quantity     INT           NOT NULL                    COMMENT '销售数量',
-    unit_price   DECIMAL(10,2) NOT NULL                    COMMENT '销售单价',
+    sale_price   DECIMAL(10,2) NOT NULL                    COMMENT '销售单价',
     total_amount DECIMAL(12,2) NOT NULL                    COMMENT '销售总金额',
-    sale_time    DATETIME      NOT NULL                    COMMENT '销售时间',
+    sale_time    DATETIME      DEFAULT CURRENT_TIMESTAMP   COMMENT '销售时间',
     remark       VARCHAR(255)                              COMMENT '备注',
     PRIMARY KEY (id),
     KEY idx_sale_medicine (medicine_id),
@@ -94,17 +94,17 @@ VALUES
 ('布洛芬缓释胶囊', '解热镇痛', '0.3g*20粒',   '中美天津史克制药有限公司',   '20250502', 6.00,  9.90,  60, 15, '2025-05-02', '2027-05-01', 1),
 ('维生素C片',      '维生素类', '100mg*100片', '哈药集团制药总厂',           '20250118', 3.20,  5.50,   8, 10, '2025-01-18', '2027-01-17', 1);
 
-INSERT INTO sale_record
-    (medicine_id, operator_id, quantity, unit_price, total_amount, sale_time, remark)
+INSERT INTO sale
+    (medicine_id, operator_id, quantity, sale_price, total_amount, sale_time, remark)
 VALUES
-(1, 2, 5, 12.50, 62.50, '2026-09-01 10:20:00', '现金支付'),
-(2, 2, 2,  9.90, 19.80, '2026-09-05 15:40:00', NULL);
+(1, 2, 5, 12.50, 62.50, '2026-09-01', '现金支付'),
+(2, 2, 2,  9.90, 19.80, '2026-09-05', NULL);
 
 -- =============================================================
 -- 数据验证（可选，手动取消注释后执行）
 -- =============================================================
 
--- ① 查看所有数据表，确认3张表（sys_user、medicine、sale_record）均已成功创建
+-- ① 查看所有数据表，确认3张表（sys_user、medicine、sale）均已成功创建
 -- SHOW TABLES;
 
 -- ② 检查用户表初始化数据是否正确插入（预期：2条记录 —— admin 和 cashier）
@@ -116,6 +116,6 @@ VALUES
 -- ④ 执行销售汇总查询，验证多表关联 JOIN 语法及聚合函数是否正常工作
 --    该查询会统计 2026 年 9 月期间每种药品的总销售数量和总销售金额
 -- SELECT m.name, SUM(s.quantity) AS total_qty, SUM(s.total_amount) AS total_amount
---   FROM sale_record s JOIN medicine m ON m.id = s.medicine_id
+--   FROM sale s JOIN medicine m ON m.id = s.medicine_id
 --  WHERE s.sale_time BETWEEN '2026-09-01 00:00:00' AND '2026-09-30 23:59:59'
 --  GROUP BY m.name;

@@ -8,8 +8,6 @@ public interface BaseDao<T> {
 
     boolean delete(Integer id);
 
-    boolean update(T entity);
-
     T findById(Integer id);
 
     List<T> findAll();

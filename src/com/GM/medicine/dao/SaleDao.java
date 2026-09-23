@@ -1,0 +1,270 @@
+package com.GM.medicine.dao;
+
+// 导入 Connection：所有 SQL 语句都必须先通过它发送给数据库
+import java.sql.Connection;
+// 导入 Date：销售日期，只精确到日
+import java.sql.Date;
+// 导入 PreparedStatement：用占位符预编译 SQL，避免拼接字符串带来的注入风险
+import java.sql.PreparedStatement;
+// 导入 ResultSet：按列名读取查询返回的销售记录数据
+import java.sql.ResultSet;
+// 导入 SQLException：接收 JDBC 操作抛出的异常，统一在本类中转成方法返回值
+import java.sql.SQLException;
+// 导入 Timestamp：sale_time 等 DATETIME 列读写时都要用它承载 LocalDateTime
+import java.util.ArrayList;
+// 导入 List：findAll 方法返回的销售记录集合类型
+import java.util.List;
+// 导入 LocalDateTime：入参是实体的销售时间，转换时需要显式声明
+import com.GM.medicine.common.util.DBUtil;
+// 导入 Sale：本 DAO 负责持久化的实体类型
+import com.GM.medicine.pojo.entity.Sale;
+
+/**
+ * - 销售记录数据访问类
+ * - 负责 sale 表的增删改查，是销售记录实体与数据库表之间的桥梁
+ * - 向上层业务代码屏蔽 JDBC 细节，使调用方只面对实体对象
+ */
+public class SaleDao implements BaseDao<Sale> {
+
+    /**
+     * 新增一条销售记录
+     *
+     * @param sale 待保存的销售记录对象，id 由数据库自增生成，无需设置
+     * @return 插入成功返回 true，失败返回 false
+     */
+    @Override
+    public boolean add(Sale sale) {
+        // 只写入业务字段，id 交给自增主键，时间字段交给数据库默认值
+        String sql = "INSERT INTO sale (medicine_id, operator_id, quantity, sale_price, total_amount, remark)"
+        +"VALUES (?, ?, ?, ?, ?, ?)";
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        try {
+            conn = DBUtil.getConnection();
+            stmt = conn.prepareStatement(sql);
+            // 外键、数量、金额这些列都没有数据库默认值，漏填时交给数据库约束直接报错，
+            stmt.setInt(1, sale.getMedicineId());
+            stmt.setInt(2, sale.getOperatorId());
+            stmt.setInt(3, sale.getQuantity());
+            stmt.setBigDecimal(4, sale.getSalePrice());
+            stmt.setBigDecimal(5, sale.getTotalAmount());
+            stmt.setString(6, sale.getRemark());
+            // executeUpdate 返回受影响行数，大于 0 说明插入成功
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            // 药品或操作员不存在（外键校验失败）、必填字段为空等问题都会走到这里
+            System.err.println("新增销售记录失败：" + e.getMessage());
+            return false;
+        } finally {
+            DBUtil.close(conn, stmt);
+        }
+    }
+
+    /**
+     * 根据销售记录 id 删除记录
+     *
+     * @param id 销售记录编号
+     * @return 删除成功返回 true，对象为空或 id 为空时返回 false
+     */
+    @Override
+    public boolean delete(Integer id) {
+        // 没有主键就无法定位记录，直接返回失败，避免误删全表
+        if (id == null) {
+            return false;
+        }
+        String sql = "DELETE FROM sale WHERE id = ?";
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        try {
+            conn = DBUtil.getConnection();
+            stmt = conn.prepareStatement(sql);
+            stmt.setInt(1, id);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("删除销售记录失败：" + e.getMessage());
+            return false;
+        } finally {
+            DBUtil.close(conn, stmt);
+        }
+    }
+
+    /**
+     * 根据 id 查询单条销售记录
+     *
+     * @param id 销售记录编号
+     * @return 查询到的销售记录对象，记录不存在时返回 null
+     */
+    @Override
+    public Sale findById(Integer id) {
+        String sql = "SELECT id, medicine_id, operator_id, quantity, sale_price, total_amount,"
+                + " sale_time, remark FROM sale WHERE id = ?";
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            stmt = conn.prepareStatement(sql);
+            stmt.setInt(1, id);
+            rs = stmt.executeQuery();
+            // 主键唯一，最多只有一行，取到就转换后返回
+            if (rs.next()) {
+                return mapRow(rs);
+            }
+            return null;
+        } catch (SQLException e) {
+            System.err.println("查询销售记录失败：" + e.getMessage());
+            return null;
+        } finally {
+            DBUtil.close(conn, stmt, rs);
+        }
+    }
+
+    /**
+     * 查询全部销售记录
+     *
+     * @return 销售记录列表，没有数据时返回空集合而不是 null
+     */
+    @Override
+    public List<Sale> findAll() {
+        // 按 id 排序，保证多次查询得到的顺序稳定
+        String sql = "SELECT id, medicine_id, operator_id, quantity, sale_price, total_amount," 
+                + " sale_time, remark FROM sale ORDER BY id";
+        List<Sale> saleList = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            stmt = conn.prepareStatement(sql);
+            rs = stmt.executeQuery();
+            // 结果集可能有多行，逐行转换后加入集合
+            while (rs.next()) {
+                saleList.add(mapRow(rs));
+            }
+        } catch (SQLException e) {
+            System.err.println("查询全部销售记录失败：" + e.getMessage());
+        } finally {
+            DBUtil.close(conn, stmt, rs);
+        }
+        return saleList;
+    }
+
+    /**
+     * 根据销售日期查询当天的全部销售记录
+     *
+     * @param date 销售日期，只精确到日，时分秒由本方法补齐
+     * @return 当天查询到的销售记录列表，当天没有数据时返回空集合而不是 null
+     */
+    public List<Sale> findByDate(Date date) {
+        // sale_time 是 DATETIME，用 sale_time = ? 比较只认识零点那一秒，白天的记录全都查不到
+        // 改成 [当天 00:00:00, 次日 00:00:00) 的半开区间：输入某一天就能命中当天所有记录
+        // 用区间而不是 DATE(sale_time) = ?，是为了让查询条件仍能走 sale_time 索引
+        String sql = "SELECT id, medicine_id, operator_id, quantity, sale_price, total_amount,"
+                + " sale_time, remark FROM sale WHERE sale_time >= ? AND sale_time < ?"
+                + " ORDER BY id";
+        List<Sale> saleList = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            stmt = conn.prepareStatement(sql);
+            // 下界是当天零点，上界是次日零点（不包含），两端的类型都要保持 DATETIME 语义
+            stmt.setDate(1, date);
+            stmt.setDate(2, Date.valueOf(date.toLocalDate().plusDays(1)));
+            rs = stmt.executeQuery();
+            // 结果集可能有多行，逐行转换后加入集合
+            while (rs.next()) {
+                saleList.add(mapRow(rs));
+            }
+        } catch (SQLException e) {
+            System.err.println("查询销售记录失败：" + e.getMessage());
+        } finally {
+            DBUtil.close(conn, stmt, rs);
+        }
+        return saleList;
+    }
+
+    /**
+     * 根据药品编号查询销售记录
+     *
+     * @param medicineId 药品编号
+     * @return 查询到的销售记录列表，没有数据时返回空集合而不是 null
+     */
+    public List<Sale> findByMedicineId(Integer medicineId) {
+        // 按 id 排序，保证多次查询得到的顺序稳定
+        String sql = "SELECT id, medicine_id, operator_id, quantity, sale_price, total_amount,"
+                + " sale_time, remark FROM sale WHERE medicine_id = ? ORDER BY id";
+        List<Sale> saleList = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            stmt = conn.prepareStatement(sql);
+            stmt.setInt(1, medicineId);
+            rs = stmt.executeQuery();
+            // 结果集可能有多行，逐行转换后加入集合
+            while (rs.next()) {
+                saleList.add(mapRow(rs));
+            }
+        } catch (SQLException e) {
+            System.err.println("查询药品销售记录失败：" + e.getMessage());
+        } finally {
+            DBUtil.close(conn, stmt, rs);
+        }
+        return saleList;
+    }
+    /**
+     * 根据订单编号查询销售记录
+     *
+     * @param orderId 订单编号
+     * @return 查询到的销售记录列表，没有数据时返回空集合而不是 null
+     */
+    public List<Sale> findByOrderId(Integer orderId) {
+        // 按 id 排序，保证多次查询得到的顺序稳定
+        String sql = "SELECT id, medicine_id, operator_id, quantity, sale_price, total_amount,"
+                + " sale_time, remark FROM sale WHERE order_id = ? ORDER BY id";
+        List<Sale> saleList = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            stmt = conn.prepareStatement(sql);
+            stmt.setInt(1, orderId);
+            rs = stmt.executeQuery();
+            // 结果集可能有多行，逐行转换后加入集合
+            while (rs.next()) {
+                saleList.add(mapRow(rs));
+            }
+        } catch (SQLException e) {
+            System.err.println("查询订单销售记录失败：" + e.getMessage());  
+        } finally {
+            DBUtil.close(conn, stmt, rs);
+        }
+        return saleList;
+    }
+
+    /**
+     * 把结果集当前行转换为销售记录对象
+     *
+     * @param rs 指向当前行的结果集
+     * @return 填充好字段的销售记录对象
+     * @throws SQLException 读取列失败时抛出，由调用方统一处理
+     */
+    private Sale mapRow(ResultSet rs) throws SQLException {
+        Sale sale = new Sale();
+        sale.setId(rs.getInt("id"));
+        sale.setMedicineId(rs.getInt("medicine_id"));
+        sale.setOperatorId(rs.getInt("operator_id"));
+        sale.setQuantity(rs.getInt("quantity"));
+        sale.setSalePrice(rs.getBigDecimal("sale_price"));
+        sale.setTotalAmount(rs.getBigDecimal("total_amount"));
+        // sale_time 是必填列，取出 Timestamp 后直接转成 LocalDateTime，无需判空
+        sale.setSaleTime(rs.getTimestamp("sale_time").toLocalDateTime());
+        sale.setRemark(rs.getString("remark"));
+        return sale;
+    }
+
+}
