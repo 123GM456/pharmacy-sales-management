@@ -4,8 +4,6 @@ package com.GM.medicine.ui;
 import java.awt.BorderLayout;
 // 导入 Dimension：设置按钮的固定宽高，使两个按钮大小一致
 import java.awt.Dimension;
-// 导入 Font：设置系统标题的字号与加粗样式
-import java.awt.Font;
 // 导入 GridBagConstraints：配合 GridBagLayout 控制表单项的位置与间距
 import java.awt.GridBagConstraints;
 // 导入 GridBagLayout：让“标签 + 输入框”两列对齐，避免使用绝对坐标
@@ -56,11 +54,11 @@ public class LoginFrame extends JFrame {
     // 密码输入框
     private JPasswordField passwordField = new JPasswordField(16);
 
-    // 登录按钮
-    private JButton loginButton = new JButton("登录");
+    // 登录按钮，主题色实心扁平样式
+    private JButton loginButton = UiTheme.createFlatButton("登录", null, UiTheme.PRIMARY, UiTheme.WHITE);
 
-    // 退出按钮
-    private JButton exitButton = new JButton("退出");
+    // 退出按钮，浅灰幽灵扁平样式，带电源图标
+    private JButton exitButton = UiTheme.createFlatButton("退出", Icons.power(14), UiTheme.BG, UiTheme.TEXT_DARK);
 
     /**
      * 构造登录窗口，完成窗口属性与界面组件的初始化
@@ -75,8 +73,11 @@ public class LoginFrame extends JFrame {
         setTitle("医药销售管理系统 - 登录");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setResizable(false);
-        setSize(380, 280);
+        setSize(380, 300);
+        // 窗口居中显示
         setLocationRelativeTo(null);
+        // 窗口使用纯白底色
+        getContentPane().setBackground(UiTheme.WHITE);
     }
 
     // 组装登录界面的标题区、表单区与按钮区，并为按钮绑定事件
@@ -93,19 +94,23 @@ public class LoginFrame extends JFrame {
         });
     }
 
-    // 创建标题区，展示系统名称
+    // 创建标题区，展示扁平化系统徽标与系统名称
     private JPanel createTitlePanel() {
         JPanel panel = new JPanel(new BorderLayout());
-        JLabel titleLabel = new JLabel("医药销售管理系统", JLabel.CENTER);
-        titleLabel.setFont(new Font("微软雅黑", Font.BOLD, 20));
+        panel.setBackground(UiTheme.WHITE);
+        JLabel titleLabel = new JLabel("医药销售管理系统", Icons.logo(40), JLabel.CENTER);
+        titleLabel.setFont(UiTheme.FONT_TITLE);
+        titleLabel.setForeground(UiTheme.TEXT_DARK);
+        titleLabel.setIconTextGap(12);
         panel.add(titleLabel, BorderLayout.CENTER);
         panel.setBorder(BorderFactory.createEmptyBorder(24, 10, 16, 10));
         return panel;
     }
 
-    // 创建表单区，用户名与密码按两列布局对齐
+    // 创建表单区，用户名与密码按两列布局对齐，标签带扁平小图标
     private JPanel createFormPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBackground(UiTheme.WHITE);
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(8, 8, 8, 8);
         gbc.anchor = GridBagConstraints.WEST;
@@ -113,14 +118,14 @@ public class LoginFrame extends JFrame {
         // 第一行：用户名
         gbc.gridx = 0;
         gbc.gridy = 0;
-        panel.add(new JLabel("用户名："), gbc);
+        panel.add(UiTheme.createLabel("用户名：", Icons.user(15), UiTheme.TEXT_DARK), gbc);
         gbc.gridx = 1;
         panel.add(userNameField, gbc);
 
         // 第二行：密码
         gbc.gridx = 0;
         gbc.gridy = 1;
-        panel.add(new JLabel("密　码："), gbc);
+        panel.add(UiTheme.createLabel("密　码：", Icons.lock(15), UiTheme.TEXT_DARK), gbc);
         gbc.gridx = 1;
         panel.add(passwordField, gbc);
 
@@ -130,8 +135,9 @@ public class LoginFrame extends JFrame {
     // 创建按钮区，横向居中放置登录与退出按钮
     private JPanel createButtonPanel() {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 16));
-        loginButton.setPreferredSize(new Dimension(90, 30));
-        exitButton.setPreferredSize(new Dimension(90, 30));
+        panel.setBackground(UiTheme.WHITE);
+        loginButton.setPreferredSize(new Dimension(100, 36));
+        exitButton.setPreferredSize(new Dimension(100, 36));
         panel.add(loginButton);
         panel.add(exitButton);
 
