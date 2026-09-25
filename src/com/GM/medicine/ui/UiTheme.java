@@ -6,6 +6,14 @@ import java.awt.Color;
 import java.awt.Cursor;
 // 导入 Font：统一样式字体（微软雅黑 粗体 20 / 常规 13），所有标题和正文都复用这里定义的字体对象
 import java.awt.Font;
+// 导入 Graphics：圆角边框绘制的画布上下文，paintBorder 的参数类型
+import java.awt.Graphics;
+// 导入 Graphics2D：Graphics 的二维增强版，用它开启抗锯齿让圆角曲线平滑
+import java.awt.Graphics2D;
+// 导入 Insets：声明圆角边框占用的留白（上下 2 / 左右 6），保证光标和文字不贴线
+import java.awt.Insets;
+// 导入 RenderingHints：抗锯齿渲染提示的键值定义
+import java.awt.RenderingHints;
 // 导入 FocusEvent：输入框获得 / 失去焦点时的事件参数类型
 import java.awt.event.FocusEvent;
 // 导入 FocusListener：监听输入框焦点变化的接口，用于切换焦点边框样式
@@ -131,19 +139,26 @@ public final class UiTheme {
     }
 
     /**
-     * 为输入框安装焦点边框效果：未选中时浅灰 1px，选中时黑色加粗 2px
-     * 适用于 JTextField / JPasswordField 等 JComponent 子类
+     * 为输入框安装焦点边框效果：未选中时浅灰 1px 圆角线，选中时深色 1px 圆角线
+     * 圆角线用匿名 Border 内部类自绘（Swing 没有现成的圆角边框），留白直接并入边框 insets
+     * 关键前提：必须关闭组件的不透明填充——JTextField 默认的直角白底会盖住圆角外的三角区域，
+     * setOpaque(false) 后透出父面板的白底，视觉上才是真正的圆角
      *
-     * @param component 要安装效果的输入框组件
+     * @param component 要安装效果的组件（JTextField / JPasswordField 等）
      */
     public static void installFocusBorder(final javax.swing.JComponent component) {
-        // 默认边框：次要文字色（TEXT_GRAY）1px 细线
-        final javax.swing.border.Border normalBorder = BorderFactory.createLineBorder(TEXT_GRAY, 1);
-        // 聚焦边框：主要文字色（TEXT_DARK）2px 加粗线条，与未选中态形成明显对比
-        final javax.swing.border.Border focusBorder = BorderFactory.createLineBorder(TEXT_DARK, 2);
+        // 圆角半径（像素）：想调整弧度只改这一个数
+        final int arc = 10;
+        // 关闭直角白色填充：否则圆角线画在直角白底上，四个角会被白底截断
+        component.setOpaque(false);
+
+        // 未选中边框：TEXT_GRAY 浅灰圆角线；聚焦边框：TEXT_DARK 深色圆角线
+        // 两者 insets 完全一致（上下 2 / 左右 6），切换时组件尺寸不变，不会引起布局跳动
+        final javax.swing.border.Border normalBorder = roundBorder(TEXT_GRAY, arc);
+        final javax.swing.border.Border focusBorder = roundBorder(TEXT_DARK, arc);
         // 先设为默认边框
         component.setBorder(normalBorder);
-        // 注册焦点监听器：获得焦点换黑边，失去焦点恢复灰边
+        // 注册焦点监听器：获得焦点换深色圆角线，失去焦点恢复浅灰圆角线
         component.addFocusListener(new FocusListener() {
             public void focusGained(FocusEvent e) {
                 component.setBorder(focusBorder);
@@ -152,5 +167,84 @@ public final class UiTheme {
                 component.setBorder(normalBorder);
             }
         });
+    }
+
+    // 创建 1px 圆角描边：匿名 Border 内部类自绘圆角矩形
+    // insets 取上下 2 / 左右 6（线 1 + 留白 5），与旧版 LineBorder(1) + EmptyBorder(1,5,1,5) 的总留白一致
+    private static javax.swing.border.Border roundBorder(final Color color, final int arc) {
+        return new javax.swing.border.Border() {
+            public void paintBorder(java.awt.Component c, Graphics g, int x, int y, int width, int height) {
+                // g.create() 克隆画布，改变抗锯齿等状态后用 dispose 恢复，不污染组件后续绘制
+                Graphics2D g2 = (Graphics2D) g.create();
+                // 开抗锯齿：不开的话圆角曲线会有明显锯齿
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(color);
+                // 画圆角描边：宽高各减 1 让 1px 线完整落在组件边界内
+                g2.drawRoundRect(x, y, width - 1, height - 1, arc, arc);
+                g2.dispose();
+            }
+            public Insets getBorderInsets(java.awt.Component c) {
+                // 线宽 1 + 留白 5，保证光标和文字不贴着圆角线
+                return new Insets(2, 6, 2, 6);
+            }
+            // 返回 false：边框是透明绘制的圆角线，Swing 不会先拿它填充整块矩形底色
+            public boolean isBorderOpaque() {
+                return false;
+            }
+        };
+    }
+
+    /**
+     * 弹出与系统扁平风格一致的提示对话框：Windows 系统标题栏 + 白底正文 + 扁平按钮
+     * 替代系统自带的 JOptionPane 弹窗（灰色 Metal 底色，与扁平界面不协调）
+     * 配色、字体、按钮全部复用本类既有资源，不引入新的样式定义
+     *
+     * @param parent  父组件，弹窗在其上方居中显示；传 null 则屏幕居中
+     * @param message 提示文字内容
+     */
+    public static void showMessageDialog(final java.awt.Component parent, String message) {
+        // 保留 Windows 系统自带标题栏（可拖动、可点 X 关闭），只有内容区按扁平风格自绘
+        final javax.swing.JDialog dialog = new javax.swing.JDialog();
+        // 系统标题栏上显示的文字
+        dialog.setTitle("提示");
+        // 模态：弹窗关闭前阻塞父窗口操作
+        dialog.setModal(true);
+        // 提示弹窗不允许拉伸，避免内容区被拉变形
+        dialog.setResizable(false);
+
+        // 内容面板：纯白底。顶部不再自绘绿色标题条（交给系统标题栏），也不画描边（系统窗口自带边框）
+        javax.swing.JPanel root = new javax.swing.JPanel(new java.awt.BorderLayout());
+        root.setBackground(WHITE);
+        dialog.setContentPane(root);
+
+        // 正文：深灰文字 + 主题普通字体，四周留白让文字不贴窗口边缘
+        javax.swing.JLabel messageLabel = new javax.swing.JLabel(message);
+        messageLabel.setFont(FONT_NORMAL);
+        messageLabel.setForeground(TEXT_DARK);
+        messageLabel.setBorder(BorderFactory.createEmptyBorder(22, 16, 22, 16));
+        root.add(messageLabel, java.awt.BorderLayout.CENTER);
+
+        // 按钮行：居中放一个扁平“确定”按钮，直接复用 createFlatButton 工厂，尺寸与登录按钮一致
+        javax.swing.JPanel buttonPanel = new javax.swing.JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 0, 12));
+        buttonPanel.setBackground(WHITE);
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(0, 16, 14, 16));
+        javax.swing.JButton okButton = createFlatButton("确定", PRIMARY, WHITE);
+        okButton.setPreferredSize(new java.awt.Dimension(90, 32));
+        buttonPanel.add(okButton);
+        root.add(buttonPanel, java.awt.BorderLayout.SOUTH);
+
+        // 点击“确定”关闭弹窗；模态弹窗关闭后本方法才返回，调用方不用关心结果
+        okButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                dialog.dispose();
+            }
+        });
+
+        // 宽高按内容自适应，最窄不低于 320 保证长提示不至于拥挤换行
+        dialog.pack();
+        dialog.setSize(Math.max(dialog.getWidth(), 320), dialog.getHeight());
+        // 在父窗口上方居中显示；parent 为 null 时自动改为屏幕居中
+        dialog.setLocationRelativeTo(parent);
+        dialog.setVisible(true);
     }
 }

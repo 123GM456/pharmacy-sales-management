@@ -24,8 +24,6 @@ import javax.swing.JButton;
 import javax.swing.JFrame;
 // 导入 JLabel：展示纯文字系统标题与表单左侧字段标签
 import javax.swing.JLabel;
-// 导入 JOptionPane：登录失败或未填写内容时弹出带警告图标的提示框
-import javax.swing.JOptionPane;
 // 导入 JPanel：承载标题、表单、按钮的容器组件
 import javax.swing.JPanel;
 // 导入 JPasswordField：密码输入框，用户输入内容以圆点显示，不暴露明文
@@ -121,7 +119,7 @@ public class LoginFrame extends JFrame {
 
         // 把标题标签放到面板中央区域
         panel.add(titleLabel, BorderLayout.CENTER);
-        // 给标题区四周围空：上 28 / 左右 10 / 下 16 像素，让标题不贴紧窗口边缘
+        // 给标题区四周围空：上 24 / 左右 10 / 下 16 像素，让标题不贴紧窗口边缘
         panel.setBorder(BorderFactory.createEmptyBorder(24, 10, 16, 10));
         return panel;
     }
@@ -133,14 +131,16 @@ public class LoginFrame extends JFrame {
         // 表单区背景纯白
         panel.setBackground(UiTheme.WHITE);
         
-        // 为两个输入框安装焦点边框效果：未选中浅灰 1px，选中黑色加粗 2px
+        // 为两个输入框安装焦点边框效果：未选中浅灰 1px，选中深色加粗 1px
+        // 内边距已装进边框里（CompoundBorder），不要再调 setMargin——自定义边框后它会失效
         UiTheme.installFocusBorder(userNameField);
         UiTheme.installFocusBorder(passwordField);
 
 
         // GridBagConstraints 描述每个单元格的约束，设一次后两行可复用
         GridBagConstraints gbc = new GridBagConstraints();
-        // 单元格四周留白：上 8 / 左 8 / 下 8 / 右 8 像素，让标签、输入框之间有间距
+        // 单元格留白：上 18 / 左右下 0 像素，行与行之间隔开，第一行与标题区也留出距离
+        // 注意不能为 0：为 0 时两行输入框会贴在一起
         gbc.insets = new Insets(18, 0, 0, 0);
         // 单元格内组件左对齐（WEST），避免文字居中显得松散
         gbc.anchor = GridBagConstraints.WEST;
@@ -170,7 +170,9 @@ public class LoginFrame extends JFrame {
     // 创建按钮区：底部一行，登录按钮居左、退出按钮居右，中间留间距
     private JPanel createButtonPanel() {
         // FlowLayout 居中对齐：组件间距 20 像素、行内上下 16 像素
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 40));
+        // vgap 不能太大：它是 SOUTH 区高度的一部分（36 + vgap*2），SOUTH 越高 CENTER 剩余越少，
+        // CENTER 一旦比表单首选高度小哪怕 1px，GridBagLayout 会整体降到最小尺寸档，输入框宽度坍缩
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 38));
         // 按钮区背景纯白
         panel.setBackground(UiTheme.WHITE);
 
@@ -202,7 +204,7 @@ public class LoginFrame extends JFrame {
      * - Service 返回非 null SysUser 时关闭登录窗、传用户对象给 MainFrame 构造主窗
      */
     private void doLogin() {
-        // 取出用户名并 trim：去掉用户不小心输进去的首尾空格，避免因空格查不到用户
+        // 取出用户名并 trim：去掉用户不小心输进去的首尾空格，避免因空格查不到用户zi'duanziduan
         String userName = userNameField.getText().trim();
         // getPassword() 返回 char[]（用完可被 GC，比 getText() 安全），再转成 String 传给 Service
         String password = new String(passwordField.getPassword());
@@ -240,8 +242,8 @@ public class LoginFrame extends JFrame {
         new MainFrame(currentUser).setVisible(true);
     }
 
-    // 统一弹警告提示：标题"提示"、黄色感叹号图标，避免各处自己 new JOptionPane 样式不一致
+    // 统一弹提示：走 UiTheme 的扁平风格对话框，替代系统自带的灰色 JOptionPane 弹窗
     private void showMessage(String message) {
-        JOptionPane.showMessageDialog(this, message, "提示", JOptionPane.WARNING_MESSAGE);
+        UiTheme.showMessageDialog(this, message);
     }
 }

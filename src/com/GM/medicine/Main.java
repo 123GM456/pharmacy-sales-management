@@ -8,6 +8,10 @@ import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 // 导入 LoginFrame：程序启动后显示的第一个窗口（登录窗）
 import com.GM.medicine.ui.LoginFrame;
+// 导入 MainFrame：跳过登录时直接打开的主窗口
+import com.GM.medicine.ui.MainFrame;
+// 导入 SysUser：测试用户对象类型，主界面靠它知道"是谁登录进来了"
+import com.GM.medicine.pojo.entity.SysUser;
 
 /**
  * - 程序入口类
@@ -27,12 +31,22 @@ public class Main {
         UIManager.put("TextField.caretForeground", Color.BLACK);
         UIManager.put("PasswordField.caretForeground", Color.BLACK);
 
+
+        // 测试变量：模拟数据库初始账号 admin（角色 = ROLE_ADMIN），配合下方跳过登录直接进主界面
+        SysUser textUser = new SysUser();
+        textUser.setId(1);
+        textUser.setUserName("admin");
+        textUser.setRealName("管理员");
+        textUser.setRole(SysUser.ROLE_ADMIN);
+
         // invokeLater 把 Runnable 丢进事件分发线程队列中排队执行
         // Swing 规范：所有 UI 创建 / 更新都必须在 EDT 上，否则多线程下会随机出现 NullPointerException / 组件不刷新等问题
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
                 // 创建登录窗口并立即显示；LoginFrame 构造器内部会调 initFrame + initComponents
-                new LoginFrame().setVisible(true);
+                //new LoginFrame().setVisible(true);
+                new MainFrame(textUser).setVisible(true);
+                
             }
         });
     }
