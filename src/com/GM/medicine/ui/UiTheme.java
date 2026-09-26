@@ -10,13 +10,15 @@ import java.awt.Font;
 import java.awt.Graphics;
 // 导入 Graphics2D：Graphics 的二维增强版，用它开启抗锯齿让圆角曲线平滑
 import java.awt.Graphics2D;
-// 导入 Insets：声明圆角边框占用的留白（上下 2 / 左右 6），保证光标和文字不贴线
+// 导入 Insets：声明圆角边框占用的留白，保证光标和文字不贴线
 import java.awt.Insets;
+// 导入 BasicStroke：设置圆角描边的线宽，支持 1px 细线与 2px 加粗
+import java.awt.BasicStroke;
 // 导入 RenderingHints：抗锯齿渲染提示的键值定义
 import java.awt.RenderingHints;
-// 导入 FocusEvent：输入框获得 / 失去焦点时的事件参数类型
+// 导入 FocusEvent：登录输入框获得 / 失去焦点时的事件参数类型
 import java.awt.event.FocusEvent;
-// 导入 FocusListener：监听输入框焦点变化的接口，用于切换焦点边框样式
+// 导入 FocusListener：监听输入框焦点变化的接口，用于切换登录输入框的焦点边框样式
 import java.awt.event.FocusListener;
 // 导入 MouseEvent：鼠标进入 / 离开按钮区域时的事件参数类型
 import java.awt.event.MouseEvent;
@@ -121,6 +123,73 @@ public final class UiTheme {
         return new Color(0xE8ECF0);
     }
 
+    // 计算圆角按钮的描边色：全部复用主题常量，且与当前底色不同、随底色联动
+    // 悬停 setBackground 换底色后，paintComponent 会用新底色重新查表，描边一起变色
+    private static Color strokeColor(Color background) {
+        // 主题绿底 → 深绿描边（PRIMARY_DARK）
+        if (background.equals(PRIMARY)) {
+            return PRIMARY_DARK;
+        }
+        // 悬停后的深绿底 → 深灰描边（TEXT_DARK），避免描边与底色同色而"消失"
+        if (background.equals(PRIMARY_DARK)) {
+            return TEXT_DARK;
+        }
+        // 其余浅灰底（退出按钮常态与悬停态）→ 中灰描边（TEXT_GRAY）
+        return TEXT_GRAY;
+    }
+
+    /**
+     * 创建圆角扁平按钮：配置与 createFlatButton 完全一致，仅把直角底色换成自绘的圆角底色
+     * 只影响本工厂创建的按钮，createFlatButton 与所有直角按钮不受影响
+     *
+     * @param text       按钮文字
+     * @param background 初始背景色
+     * @param foreground 文字颜色
+     * @return 设置好圆角扁平样式的 JButton 实例
+     */
+    public static JButton createRoundButton(String text, Color background, Color foreground) {
+        // 匿名子类：关闭默认直角填充，先自绘圆角底色再画文字
+        JButton button = new JButton(text) {
+            protected void paintComponent(Graphics g) {
+                // 克隆画布开抗锯齿：圆角边缘平滑，用完 dispose 不污染后续绘制
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                // 用背景色填充圆角矩形：悬停变色通过 setBackground 换色即可生效
+                g2.setColor(getBackground());
+                g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 20, 20); // 可修改参数：圆角半径（20）
+                // 画圆角描边：颜色随当前底色联动（见 strokeColor），悬停变色时描边一起变
+                g2.setColor(strokeColor(getBackground()));
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 20, 20);
+                g2.dispose();
+                // 父类继续绘制按钮文字
+                super.paintComponent(g);
+            }
+        };
+        // 以下配置与 createFlatButton 保持一致
+        button.setFont(FONT_NORMAL);
+        button.setForeground(foreground);
+        button.setBackground(background);
+        button.setFocusPainted(false);
+        // 关闭 Swing 默认底色绘制：底色完全由上面的 paintComponent 自绘圆角
+        button.setContentAreaFilled(false);
+        // 按钮本体透明：直角矩形不再填充，只显示圆角底色
+        button.setOpaque(false);
+        // 用空边框控制按钮内边距：上 8 / 右 18 / 下 8 / 左 18
+        button.setBorder(BorderFactory.createEmptyBorder(8, 18, 8, 18));
+        // 鼠标移动到按钮上时显示手型光标，暗示这个区域可以点击
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        // 注册匿名 MouseAdapter：鼠标进入按钮区域时换悬停色，离开时恢复原色（复用 hoverColor）
+        button.addMouseListener(new MouseAdapter() {
+            public void mouseEntered(MouseEvent e) {
+                button.setBackground(hoverColor(background));
+            }
+            public void mouseExited(MouseEvent e) {
+                button.setBackground(background);
+            }
+        });
+        return button;
+    }
+
     /**
      * 创建统一样式的标签：统一字体、统一颜色、左对齐，不带图标
      *
@@ -140,22 +209,20 @@ public final class UiTheme {
 
     /**
      * 为输入框安装焦点边框效果：未选中时浅灰 1px 圆角线，选中时深色 1px 圆角线
-     * 圆角线用匿名 Border 内部类自绘（Swing 没有现成的圆角边框），留白直接并入边框 insets
+     * 圆角线由 roundBorder 自绘（Swing 没有现成的圆角边框），留白直接并入边框 insets
      * 关键前提：必须关闭组件的不透明填充——JTextField 默认的直角白底会盖住圆角外的三角区域，
      * setOpaque(false) 后透出父面板的白底，视觉上才是真正的圆角
      *
      * @param component 要安装效果的组件（JTextField / JPasswordField 等）
      */
     public static void installFocusBorder(final javax.swing.JComponent component) {
-        // 圆角半径（像素）：想调整弧度只改这一个数
-        final int arc = 10;
         // 关闭直角白色填充：否则圆角线画在直角白底上，四个角会被白底截断
         component.setOpaque(false);
 
         // 未选中边框：TEXT_GRAY 浅灰圆角线；聚焦边框：TEXT_DARK 深色圆角线
         // 两者 insets 完全一致（上下 2 / 左右 6），切换时组件尺寸不变，不会引起布局跳动
-        final javax.swing.border.Border normalBorder = roundBorder(TEXT_GRAY, arc);
-        final javax.swing.border.Border focusBorder = roundBorder(TEXT_DARK, arc);
+        final javax.swing.border.Border normalBorder = roundBorder(TEXT_GRAY, 1);
+        final javax.swing.border.Border focusBorder = roundBorder(TEXT_DARK, 1);
         // 先设为默认边框
         component.setBorder(normalBorder);
         // 注册焦点监听器：获得焦点换深色圆角线，失去焦点恢复浅灰圆角线
@@ -169,9 +236,11 @@ public final class UiTheme {
         });
     }
 
-    // 创建 1px 圆角描边：匿名 Border 内部类自绘圆角矩形
-    // insets 取上下 2 / 左右 6（线 1 + 留白 5），与旧版 LineBorder(1) + EmptyBorder(1,5,1,5) 的总留白一致
-    private static javax.swing.border.Border roundBorder(final Color color, final int arc) {
+    // 创建圆角描边：匿名 Border 内部类自绘圆角矩形，输入框与导航按钮共用这一套绘制
+    // insets 取上下 线宽+1 / 左右 线宽+5：线宽 1 时为上下 2 / 左右 6，线宽 2 时为上下 3 / 左右 7
+    public static javax.swing.border.Border roundBorder(final Color color, final int thickness) {
+        // 圆角半径（像素）：想调整弧度只改这一个数
+        final int arc = 10;
         return new javax.swing.border.Border() {
             public void paintBorder(java.awt.Component c, Graphics g, int x, int y, int width, int height) {
                 // g.create() 克隆画布，改变抗锯齿等状态后用 dispose 恢复，不污染组件后续绘制
@@ -179,13 +248,16 @@ public final class UiTheme {
                 // 开抗锯齿：不开的话圆角曲线会有明显锯齿
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(color);
-                // 画圆角描边：宽高各减 1 让 1px 线完整落在组件边界内
-                g2.drawRoundRect(x, y, width - 1, height - 1, arc, arc);
+                // 换粗画笔支持加粗：线画在路径两侧各一半，整体内收半个线宽避免溢出组件边界
+                g2.setStroke(new BasicStroke(thickness));
+                int half = thickness / 2;
+                // 画圆角描边：宽高各减一个线宽，让线完整落在组件边界内
+                g2.drawRoundRect(x + half, y + half, width - thickness, height - thickness, arc, arc);
                 g2.dispose();
             }
             public Insets getBorderInsets(java.awt.Component c) {
-                // 线宽 1 + 留白 5，保证光标和文字不贴着圆角线
-                return new Insets(2, 6, 2, 6);
+                // 上下留白 1 / 左右留白 5，加上线宽本身，保证光标和文字不贴着圆角线
+                return new Insets(thickness + 1, thickness + 5, thickness + 1, thickness + 5);
             }
             // 返回 false：边框是透明绘制的圆角线，Swing 不会先拿它填充整块矩形底色
             public boolean isBorderOpaque() {
@@ -246,5 +318,74 @@ public final class UiTheme {
         // 在父窗口上方居中显示；parent 为 null 时自动改为屏幕居中
         dialog.setLocationRelativeTo(parent);
         dialog.setVisible(true);
+    }
+
+    /**
+     * 弹出与系统扁平风格一致的确认对话框：Windows 系统标题栏 + 白底正文 + "确定 / 取消"两个扁平按钮
+     * 替代系统自带的 JOptionPane.showConfirmDialog（灰色 Metal 底色，与扁平界面不协调）
+     *
+     * @param parent  父组件，弹窗在其上方居中显示；传 null 则屏幕居中
+     * @param message 提示文字内容
+     * @return 点击"确定"返回 true；点击"取消"或点标题栏 X 关闭返回 false
+     */
+    public static boolean showConfirmDialog(final java.awt.Component parent, String message) {
+        // 记录用户选择：只有点了"确定"才置为 true，其余任何关闭方式都视为取消
+        final boolean[] confirmed = {false};
+
+        // 保留 Windows 系统自带标题栏（可拖动、可点 X 关闭），只有内容区按扁平风格自绘
+        final javax.swing.JDialog dialog = new javax.swing.JDialog();
+        // 系统标题栏上显示的文字
+        dialog.setTitle("确认");
+        // 模态：弹窗关闭前阻塞父窗口操作
+        dialog.setModal(true);
+        // 确认弹窗不允许拉伸，避免内容区被拉变形
+        dialog.setResizable(false);
+
+        // 内容面板：纯白底，与提示弹窗保持一致
+        javax.swing.JPanel root = new javax.swing.JPanel(new java.awt.BorderLayout());
+        root.setBackground(WHITE);
+        dialog.setContentPane(root);
+
+        // 正文：深灰文字 + 主题普通字体，四周留白让文字不贴窗口边缘
+        javax.swing.JLabel messageLabel = new javax.swing.JLabel(message);
+        messageLabel.setFont(FONT_NORMAL);
+        messageLabel.setForeground(TEXT_DARK);
+        messageLabel.setBorder(BorderFactory.createEmptyBorder(22, 16, 22, 16));
+        root.add(messageLabel, java.awt.BorderLayout.CENTER);
+
+        // 按钮行：居中放"确定"（主题绿实心）和"取消"（浅灰幽灵）两个按钮，样式与保存/取消按钮一致
+        javax.swing.JPanel buttonPanel = new javax.swing.JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 16, 12));
+        buttonPanel.setBackground(WHITE);
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(0, 16, 14, 16));
+        javax.swing.JButton okButton = createFlatButton("确定", PRIMARY, WHITE);
+        javax.swing.JButton cancelButton = createFlatButton("取消", BG, TEXT_DARK);
+        okButton.setPreferredSize(new java.awt.Dimension(90, 32));
+        cancelButton.setPreferredSize(new java.awt.Dimension(90, 32));
+        buttonPanel.add(okButton);
+        buttonPanel.add(cancelButton);
+        root.add(buttonPanel, java.awt.BorderLayout.SOUTH);
+
+        // 点击"确定"：记录选择并关闭弹窗，方法返回 true
+        okButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                confirmed[0] = true;
+                dialog.dispose();
+            }
+        });
+        // 点击"取消"：直接关闭弹窗，confirmed 保持 false
+        cancelButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                dialog.dispose();
+            }
+        });
+
+        // 宽高按内容自适应，最窄不低于 320 保证长提示不至于拥挤换行
+        dialog.pack();
+        dialog.setSize(Math.max(dialog.getWidth(), 320), dialog.getHeight());
+        // 在父窗口上方居中显示；parent 为 null 时自动改为屏幕居中
+        dialog.setLocationRelativeTo(parent);
+        // setVisible(true) 模态阻塞到这里，弹窗关闭后才能把用户的选择返回给调用方
+        dialog.setVisible(true);
+        return confirmed[0];
     }
 }

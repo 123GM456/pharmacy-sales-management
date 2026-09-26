@@ -83,7 +83,7 @@ CREATE TABLE sale (
 -- =============================================================
 -- password 列存放 BCrypt 哈希串：admin 和 cashier 的明文密码均为 123456
 INSERT INTO sys_user (username, password, real_name, phone, role, status) VALUES
-('admin',   '$2a$10$9XL7I7DSpuVoEZqopX87Wud47vWbbGfLKyjbMwz1nSHfJ3by0YfkW', '系统管理员', '13800138001', 1, 1),
+('admin',   '$2a$10$9XL7I7DSpuVoEZqopX87Wud47vWbbGfLKyjbMwz1nSHfJ3by0YfkW', '管理员', '13800138001', 1, 1),
 ('cashier', '$2a$10$BSMmTPw3rTyWiFLSPpJD5uJYvvmWXzM5cCVVIQN/AjAE/RDM2zX9G', '张小明',    '13900139002', 0, 1);
 
 INSERT INTO medicine

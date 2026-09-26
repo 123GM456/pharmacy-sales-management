@@ -44,8 +44,8 @@ public class Main {
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
                 // 创建登录窗口并立即显示；LoginFrame 构造器内部会调 initFrame + initComponents
-                //new LoginFrame().setVisible(true);
-                new MainFrame(textUser).setVisible(true);
+                new LoginFrame().setVisible(true);
+                //new MainFrame(textUser).setVisible(true);
                 
             }
         });

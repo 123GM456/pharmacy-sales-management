@@ -1,4 +1,4 @@
-package com.GM.medicine.ui.sale;
+package com.GM.medicine.ui;
 
 // 导入 JDialog：销售对话框的基类，用于弹出录入销售信息的表单
 import javax.swing.JDialog;

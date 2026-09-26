@@ -1,6 +1,6 @@
-package com.GM.medicine.ui.sale;
+package com.GM.medicine.ui;
 
-// 导入 JPanel：销售管理面板的基类，用于嵌入主窗口的选项卡区域
+// 导入 JPanel：销售管理面板的基类，用于嵌入主窗口的内容区域
 import javax.swing.JPanel;
 
 /**

@@ -52,11 +52,11 @@ public class LoginFrame extends JFrame {
     // 密码输入框：同上，内部自带密码遮罩（默认圆点）
     private JPasswordField passwordField = new JPasswordField(16);
 
-    // 登录按钮：调用 UiTheme 工厂方法创建扁平样式，文字"登录"、主题绿实心背景、白色字
-    private JButton loginButton = UiTheme.createFlatButton("登录", UiTheme.PRIMARY, UiTheme.WHITE);
+    // 登录按钮：圆角扁平样式，文字"登录"、主题绿实心背景、白色字
+    private JButton loginButton = UiTheme.createRoundButton("登    录", UiTheme.PRIMARY, UiTheme.WHITE);
 
-    // 退出按钮：文字"退出"、浅灰幽灵按钮样式、深灰字
-    private JButton exitButton = UiTheme.createFlatButton("退出", UiTheme.BG, UiTheme.TEXT_DARK);
+    // 退出按钮：圆角扁平样式，文字"退出"、浅灰底、深灰字
+    private JButton exitButton = UiTheme.createRoundButton("退    出", UiTheme.BG, UiTheme.TEXT_DARK);
 
     /**
      * 构造登录窗口：初始化窗口属性 + 组装界面组件
@@ -131,7 +131,7 @@ public class LoginFrame extends JFrame {
         // 表单区背景纯白
         panel.setBackground(UiTheme.WHITE);
         
-        // 为两个输入框安装焦点边框效果：未选中浅灰 1px，选中深色加粗 1px
+        // 为两个输入框安装焦点边框效果：未选中浅灰 1px，选中深色 1px
         // 内边距已装进边框里（CompoundBorder），不要再调 setMargin——自定义边框后它会失效
         UiTheme.installFocusBorder(userNameField);
         UiTheme.installFocusBorder(passwordField);

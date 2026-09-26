@@ -1,4 +1,4 @@
-package com.GM.medicine.ui.system;
+package com.GM.medicine.ui;
 
 // 导入 JDialog：修改密码对话框的基类，用于弹出修改密码的表单
 import javax.swing.JDialog;
