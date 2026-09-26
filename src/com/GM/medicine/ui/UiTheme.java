@@ -208,6 +208,122 @@ public final class UiTheme {
     }
 
     /**
+     * 创建扁平化下拉框：白底主体 + 右侧浅灰箭头色块 + 黑色箭头，整体无立体感
+     * 鼠标悬停、下拉框获得焦点、点击展开时箭头色块加深；主体边框与输入框同款圆角浅灰线
+     *
+     * @param items 下拉选项文字数组
+     * @return 设置好扁平样式的下拉框
+     */
+    public static javax.swing.JComboBox<String> createComboBox(String[] items) {
+        // 匿名子类：仅固定首选高度与输入框一致，避免默认 UI 撑高导致与表单其他输入框不齐
+        javax.swing.JComboBox<String> box = new javax.swing.JComboBox<String>(items) {
+            public java.awt.Dimension getPreferredSize() {
+                // 宽度沿用默认计算（由最长选项决定），高度强制为 22
+                java.awt.Dimension size = super.getPreferredSize();
+                size.height = 22; // 可修改参数：下拉框高度（实测 roundBorder 输入框首选高度 22）
+                return size;
+            }
+        };
+        // 字体与颜色：普通字体、深灰文字、白底，与输入框保持一致
+        box.setFont(FONT_NORMAL);
+        box.setForeground(TEXT_DARK);
+        box.setBackground(WHITE);
+        // 圆角浅灰边框：与输入框复用同一套 roundBorder 圆角描边，保证外观统一
+        box.setBorder(roundBorder(TEXT_GRAY, 1));
+        // 替换默认 Metal 立体箭头：右侧浅灰色块 + 黑色箭头，悬停/聚焦/展开时色块加深
+        box.setUI(new javax.swing.plaf.basic.BasicComboBoxUI() {
+            // 下拉列表弹层默认带深色立体边框，统一改为与输入框一致的浅灰 1px 细边框
+            protected javax.swing.plaf.basic.ComboPopup createPopup() {
+                javax.swing.plaf.basic.ComboPopup popup = super.createPopup();
+                ((javax.swing.JComponent) popup).setBorder(javax.swing.BorderFactory.createLineBorder(TEXT_GRAY, 1)); // 可修改参数：弹层边框颜色
+                return popup;
+            }
+            // 封闭框聚焦时 BasicComboBoxUI 会强制用下拉列表的选中色渲染当前值（默认是深色底），
+            // 安装 UI 后把列表选中色改为白底深字：主体聚焦时保持白底，加深只作用于箭头色块
+            public void installUI(javax.swing.JComponent c) {
+                super.installUI(c);
+                listBox.setSelectionBackground(WHITE);
+                listBox.setSelectionForeground(TEXT_DARK);
+            }
+            protected javax.swing.JButton createArrowButton() {
+                // 匿名子类：自绘实心下三角，形状等效字符"▼"但不受字体和按钮宽度影响——
+                // 窄按钮放不下字符时 Swing 会把文字截断显示为"…"省略号，自绘则任何宽度都正确
+                javax.swing.JButton button = new javax.swing.JButton() {
+                    protected void paintComponent(Graphics g) {
+                        // 先铺满浅灰色块底色（悬停/聚焦加深通过 setBackground 换色即可生效）
+                        g.setColor(getBackground());
+                        g.fillRect(0, 0, getWidth(), getHeight());
+                        // 开抗锯齿后用多边形填充画实心下三角：底边在上、顶点在下，水平垂直居中
+                        Graphics2D g2 = (Graphics2D) g.create();
+                        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                        int centerX = getWidth() / 2;
+                        int centerY = getHeight() / 2;
+                        int halfWidth = 5; // 可修改参数：三角形底边半宽（总宽 10）
+                        int height = 6; // 可修改参数：三角形高度（6）
+                        int[] xs = {centerX - halfWidth, centerX + halfWidth, centerX};
+                        int[] ys = {centerY - height / 2, centerY - height / 2, centerY + height / 2};
+                        // 箭头用深灰近黑色，与文字主色一致
+                        g2.setColor(TEXT_DARK);
+                        g2.fillPolygon(xs, ys, 3);
+                        g2.dispose();
+                    }
+                };
+                // 常态浅灰色块：与系统背景色一致，扁平无立体边框
+                button.setBackground(BG);
+                button.setOpaque(true);
+                button.setContentAreaFilled(false);
+                button.setFocusPainted(false);
+                button.setBorder(BorderFactory.createEmptyBorder(2, 8, 2, 8)); // 可修改参数：箭头区大小（上下 2 / 左右 8）
+                button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                // 鼠标悬停时色块加深，移开恢复
+                button.addMouseListener(new java.awt.event.MouseAdapter() {
+                    public void mouseEntered(java.awt.event.MouseEvent e) {
+                        button.setBackground(new Color(0xE8ECF0)); // 可修改参数：悬停/聚焦加深色
+                    }
+                    public void mouseExited(java.awt.event.MouseEvent e) {
+                        button.setBackground(BG);
+                    }
+                });
+                // 下拉框获得焦点（点击或 Tab 切入）时色块同步加深，失去焦点恢复
+                box.addFocusListener(new java.awt.event.FocusListener() {
+                    public void focusGained(java.awt.event.FocusEvent e) {
+                        button.setBackground(new Color(0xE8ECF0));
+                    }
+                    public void focusLost(java.awt.event.FocusEvent e) {
+                        button.setBackground(BG);
+                    }
+                });
+                return button;
+            }
+        });
+        // 下拉列表项渲染器：统一字体、白底、选中项浅灰底，去掉默认的立体选中框
+        box.setRenderer(new javax.swing.DefaultListCellRenderer() {
+            // DefaultListCellRenderer 会在"自身背景色与父容器相同"时把 isOpaque 判为 false 而跳过绘制背景，
+            // 导致 UI 预填的灰色（Metal 默认 ComboBox.background=#EEEEEE）透出来；这里强制始终绘制背景
+            public boolean isOpaque() {
+                return true;
+            }
+            public java.awt.Component getListCellRendererComponent(javax.swing.JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                // 先由父类完成基础渲染，再覆盖扁平样式
+                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                setFont(FONT_NORMAL);
+                setForeground(TEXT_DARK);
+                if (index == -1) {
+                    // index=-1 表示封闭状态下拉框的当前值：白底与输入框一致；上下不留白，防止固定高度下文字被裁剪
+                    setBackground(WHITE);
+                    setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 2)); // 可修改参数：当前值内边距（左右 2）
+                } else {
+                    // 下拉列表项：选中项浅灰底、其余白底，用背景色区分选中
+                    setBackground(isSelected ? BG : WHITE);
+                    setBorder(BorderFactory.createEmptyBorder(4, 6, 4, 6)); // 可修改参数：列表项内边距（上下 4 / 左右 6）
+                }
+                return this;
+            }
+        });
+        return box;
+    }
+
+    /**
      * 为输入框安装焦点边框效果：未选中时浅灰 1px 圆角线，选中时深色 1px 圆角线
      * 圆角线由 roundBorder 自绘（Swing 没有现成的圆角边框），留白直接并入边框 insets
      * 关键前提：必须关闭组件的不透明填充——JTextField 默认的直角白底会盖住圆角外的三角区域，
@@ -296,11 +412,11 @@ public final class UiTheme {
         messageLabel.setBorder(BorderFactory.createEmptyBorder(22, 16, 22, 16));
         root.add(messageLabel, java.awt.BorderLayout.CENTER);
 
-        // 按钮行：居中放一个扁平“确定”按钮，直接复用 createFlatButton 工厂，尺寸与登录按钮一致
+        // 按钮行：居中放一个圆角“确定”按钮（登录类：绿底白字+描边），复用 createRoundButton 工厂，尺寸与登录按钮一致
         javax.swing.JPanel buttonPanel = new javax.swing.JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 0, 12));
         buttonPanel.setBackground(WHITE);
         buttonPanel.setBorder(BorderFactory.createEmptyBorder(0, 16, 14, 16));
-        javax.swing.JButton okButton = createFlatButton("确定", PRIMARY, WHITE);
+        javax.swing.JButton okButton = createRoundButton("确定", PRIMARY, WHITE);
         okButton.setPreferredSize(new java.awt.Dimension(90, 32));
         buttonPanel.add(okButton);
         root.add(buttonPanel, java.awt.BorderLayout.SOUTH);
@@ -353,12 +469,12 @@ public final class UiTheme {
         messageLabel.setBorder(BorderFactory.createEmptyBorder(22, 16, 22, 16));
         root.add(messageLabel, java.awt.BorderLayout.CENTER);
 
-        // 按钮行：居中放"确定"（主题绿实心）和"取消"（浅灰幽灵）两个按钮，样式与保存/取消按钮一致
+        // 按钮行：居中放"确定"（登录类：绿底白字）和"取消"（退出类：白底深灰字）两个圆角按钮，样式与登录/退出按钮一致
         javax.swing.JPanel buttonPanel = new javax.swing.JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 16, 12));
         buttonPanel.setBackground(WHITE);
         buttonPanel.setBorder(BorderFactory.createEmptyBorder(0, 16, 14, 16));
-        javax.swing.JButton okButton = createFlatButton("确定", PRIMARY, WHITE);
-        javax.swing.JButton cancelButton = createFlatButton("取消", BG, TEXT_DARK);
+        javax.swing.JButton okButton = createRoundButton("确定", PRIMARY, WHITE);
+        javax.swing.JButton cancelButton = createRoundButton("取消", WHITE, TEXT_DARK);
         okButton.setPreferredSize(new java.awt.Dimension(90, 32));
         cancelButton.setPreferredSize(new java.awt.Dimension(90, 32));
         buttonPanel.add(okButton);

@@ -219,8 +219,8 @@ public class MainFrame extends JFrame {
         panel.add(Box.createVerticalGlue());
 
         // ===== 退出登录：放导航栏底部，圆角+描边+悬停加深样式与登录界面"退出"按钮一致 =====
-        // 用圆角按钮工厂创建：浅灰圆角底、TEXT_GRAY 描边，悬停时底色加深、描边联动变色
-        JButton logoutButton = UiTheme.createRoundButton("退出登录", UiTheme.BG, UiTheme.TEXT_DARK);
+        // 用圆角按钮工厂创建：白色圆角底、TEXT_GRAY 描边，悬停时底色加深为浅灰、描边联动变色
+        JButton logoutButton = UiTheme.createRoundButton("退出登录", UiTheme.WHITE, UiTheme.TEXT_DARK);
         logoutButton.setPreferredSize(new Dimension(100, 40)); // 可修改参数：退出登录按钮大小（宽 100 / 高 40）
         logoutButton.setMaximumSize(new Dimension(100, 40)); // 与首选大小保持一致，防止被 BoxLayout 拉伸
         logoutButton.setAlignmentX(Component.CENTER_ALIGNMENT);

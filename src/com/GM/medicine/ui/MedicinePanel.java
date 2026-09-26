@@ -18,6 +18,10 @@ import java.time.format.DateTimeFormatter;
 import java.awt.event.ActionEvent;
 // 导入 ActionListener：为分类按钮、查询按钮注册点击监听的接口
 import java.awt.event.ActionListener;
+// 导入 MouseEvent：表格悬停跟踪的鼠标事件参数类型
+import java.awt.event.MouseEvent;
+// 导入 MouseAdapter：一个类同时接收点击与移动事件，用于跟踪操作列的悬停行号
+import java.awt.event.MouseAdapter;
 // 导入 Box：创建分类按钮之间的固定间距（Strut）
 import javax.swing.Box;
 // 导入 BoxLayout：分类栏沿垂直方向排列
@@ -46,6 +50,8 @@ import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 // 导入 TableCellRenderer：把操作列渲染成按钮外观
 import javax.swing.table.TableCellRenderer;
+// 导入 Border：声明分类按钮的普通 / 选中两种状态边框类型
+import javax.swing.border.Border;
 // 导入 ArrayList / List：当前分类与名称过滤后的药品列表
 import java.util.ArrayList;
 import java.util.List;
@@ -83,10 +89,10 @@ public class MedicinePanel extends JPanel {
     private JTextField searchField = new JTextField(14); // 可修改参数：查询框推荐列数（14）
 
     // 查询按钮：按名称过滤当前列表
-    private JButton searchButton = UiTheme.createFlatButton("查询", UiTheme.BG, UiTheme.TEXT_DARK);
+    private JButton searchButton = UiTheme.createRoundButton("查询", UiTheme.PRIMARY, UiTheme.WHITE);
 
     // 新增药品按钮：主题绿实心，强调主要操作
-    private JButton addButton = UiTheme.createFlatButton("新增药品", UiTheme.PRIMARY, UiTheme.WHITE);
+    private JButton addButton = UiTheme.createRoundButton("新增药品", UiTheme.PRIMARY, UiTheme.WHITE);
 
     // 当前分类的完整药品列表（Service 返回的原始结果）
     private List<Medicine> categoryList = new ArrayList<>();
@@ -99,6 +105,17 @@ public class MedicinePanel extends JPanel {
 
     // 当前选中的分类按钮：切换时恢复上一个按钮的底色
     private JButton selectedCategory;
+
+    // 分类按钮普通态边框：1px 浅灰圆角细线（外围补 1px 空白），未选中时一直显示，与主界面导航按钮一致
+    private Border categoryNormalBorder = BorderFactory.createCompoundBorder(
+            BorderFactory.createEmptyBorder(1, 1, 1, 1),
+            UiTheme.roundBorder(UiTheme.TEXT_GRAY, 1));
+
+    // 分类按钮选中边框：深灰圆角线，选中后一直保持，与主界面导航按钮一致
+    private Border categorySelectedBorder = UiTheme.roundBorder(UiTheme.TEXT_DARK, 1);
+
+    // 操作列当前悬停的行号：-1 表示鼠标不在"修改"按钮上，用于驱动按钮悬停加深
+    private int hoverRow = -1;
 
     /**
      * 构造药品管理面板：组装分类栏与列表区，默认加载"全部药品"
@@ -184,14 +201,50 @@ public class MedicinePanel extends JPanel {
         table.getTableHeader().setFont(UiTheme.FONT_NORMAL);
         table.getTableHeader().setBackground(UiTheme.BG);
         table.getTableHeader().setReorderingAllowed(false);
-        // 列宽：名称列宽一点，操作列窄一点
-        table.getColumnModel().getColumn(0).setPreferredWidth(130); // 可修改参数：药品名称列宽
-        table.getColumnModel().getColumn(8).setPreferredWidth(70); // 可修改参数：操作列宽
+        // 列宽：长短不定的列（名称/规格/厂家/价格/库存）留余量防截断，内容固定的列（日期/状态/操作）收紧
+        table.getColumnModel().getColumn(0).setPreferredWidth(140); // 可修改参数：药品名称列宽（药名长短不定，留余量）
+        table.getColumnModel().getColumn(1).setPreferredWidth(80); // 可修改参数：分类列宽（最长"解热镇痛"4 字）
+        table.getColumnModel().getColumn(2).setPreferredWidth(120); // 可修改参数：规格列宽（如"0.25g*24粒/盒"约 13 字符）
+        table.getColumnModel().getColumn(3).setPreferredWidth(160); // 可修改参数：生产厂家列宽（厂名长短最悬殊，余量最大）
+        table.getColumnModel().getColumn(4).setPreferredWidth(70); // 可修改参数：销售价格列宽（保证列头"销售价格"4 字完整）
+        table.getColumnModel().getColumn(5).setPreferredWidth(70); // 可修改参数：库存列宽（数量长短不定，留余量）
+        table.getColumnModel().getColumn(6).setPreferredWidth(100); // 可修改参数：有效期至列宽（固定 10 字符日期 + 列头 4 字）
+        table.getColumnModel().getColumn(7).setPreferredWidth(35); // 可修改参数：状态列宽（最长"正常/停售"2 字）
+        table.getColumnModel().getColumn(8).setPreferredWidth(70); // 可修改参数：操作列宽（"修改"按钮宽度）
+
+        // 操作列悬停跟踪：表格单元格里的按钮不接收鼠标事件，悬停变色由表格代为跟踪行号后交给渲染器
+        MouseAdapter hoverTracker = new MouseAdapter() {
+            public void mouseMoved(MouseEvent e) {
+                // 鼠标所在列是操作列（第 8 列）时记录行号，否则记 -1 表示不在按钮上
+                int row = table.rowAtPoint(e.getPoint());
+                int newHoverRow = (table.columnAtPoint(e.getPoint()) == 8) ? row : -1;
+                // 悬停行变化时重绘表格，渲染器会用新的悬停状态画按钮
+                if (newHoverRow != hoverRow) {
+                    hoverRow = newHoverRow;
+                    table.repaint();
+                }
+            }
+            public void mouseExited(MouseEvent e) {
+                // 鼠标移出表格时清除悬停行，按钮恢复原色
+                if (hoverRow != -1) {
+                    hoverRow = -1;
+                    table.repaint();
+                }
+            }
+        };
+        table.addMouseListener(hoverTracker);
+        table.addMouseMotionListener(hoverTracker);
 
         // 操作列渲染按钮：所有行的"修改"按钮共用同一个外观实例
         JButton renderButton = createCellButton();
         table.getColumnModel().getColumn(8).setCellRenderer(new TableCellRenderer() {
             public Component getTableCellRendererComponent(JTable t, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                // 鼠标悬停在当前行的"修改"按钮上时底色加深，与"新增药品"按钮悬停效果一致；移开后恢复主题绿
+                if (row == hoverRow) {
+                    renderButton.setBackground(UiTheme.PRIMARY_DARK);
+                } else {
+                    renderButton.setBackground(UiTheme.PRIMARY);
+                }
                 return renderButton;
             }
         });
@@ -279,7 +332,7 @@ public class MedicinePanel extends JPanel {
         panel.add(availableButton);
         panel.add(Box.createVerticalStrut(8));
 
-        JButton warningButton = createCategoryButton("库存预警");
+        JButton warningButton = createCategoryButton("预警药品");
         warningButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 loadCategory("warning");
@@ -308,8 +361,10 @@ public class MedicinePanel extends JPanel {
         JButton button = new JButton(text);
         button.setFont(UiTheme.FONT_NORMAL);
         button.setForeground(UiTheme.TEXT_DARK);
-        // 初始底色浅灰，选中后换成白色卡片
-        button.setBackground(UiTheme.BG);
+        // 底色固定白色，选中与否只切换边框（与主界面导航按钮一致）
+        button.setBackground(UiTheme.WHITE);
+        // 默认 1px 浅灰细边框：未选中的常态外观，与选中边框占位一致，切换时按钮内容不跳动
+        button.setBorder(categoryNormalBorder);
         button.setFocusPainted(false);
         button.setContentAreaFilled(false);
         button.setOpaque(true);
@@ -320,13 +375,13 @@ public class MedicinePanel extends JPanel {
         return button;
     }
 
-    // 切换分类选中态：上一个按钮恢复浅灰，新按钮换成白色卡片
+    // 切换分类选中态：底色都保持白色，上一个按钮恢复细边框，新按钮换成深灰边框一直保持（与主界面导航按钮一致）
     private void selectCategory(JButton button) {
         if (selectedCategory != null) {
-            selectedCategory.setBackground(UiTheme.BG);
+            selectedCategory.setBorder(categoryNormalBorder);
         }
         selectedCategory = button;
-        selectedCategory.setBackground(UiTheme.WHITE);
+        selectedCategory.setBorder(categorySelectedBorder);
     }
 
     // 创建右侧列表区：顶部工具栏 + 药品表格

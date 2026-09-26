@@ -88,14 +88,14 @@ public class MedicineDialog extends JDialog {
     // 有效期输入框（yyyy-MM-dd）
     private JTextField expiryDateField;
 
-    // 状态下拉框：0 号位"正常"对应 status=1，1 号位"停售"对应 status=0
-    private JComboBox<String> statusBox = new JComboBox<>(new String[]{"正常", "停售"});
+    // 状态下拉框：0 号位"正常"对应 status=1，1 号位"停售"对应 status=0；扁平风格由 UiTheme 工厂统一
+    private JComboBox<String> statusBox = UiTheme.createComboBox(new String[]{"正常", "停售"});
 
-    // 保存按钮：主题绿实心
-    private JButton saveButton = UiTheme.createFlatButton("保存", UiTheme.PRIMARY, UiTheme.WHITE);
+    // 保存按钮：主题绿圆角+描边，与登录按钮同款
+    private JButton saveButton = UiTheme.createRoundButton("保存", UiTheme.PRIMARY, UiTheme.WHITE);
 
-    // 取消按钮：浅灰幽灵样式
-    private JButton cancelButton = UiTheme.createFlatButton("取消", UiTheme.BG, UiTheme.TEXT_DARK);
+    // 取消按钮：白色圆角+描边，与登录界面"退出"按钮同款
+    private JButton cancelButton = UiTheme.createRoundButton("取消", UiTheme.WHITE, UiTheme.TEXT_DARK);
 
     /**
      * 构造药品编辑对话框

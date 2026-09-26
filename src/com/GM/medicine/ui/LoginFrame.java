@@ -53,10 +53,10 @@ public class LoginFrame extends JFrame {
     private JPasswordField passwordField = new JPasswordField(16);
 
     // 登录按钮：圆角扁平样式，文字"登录"、主题绿实心背景、白色字
-    private JButton loginButton = UiTheme.createRoundButton("登    录", UiTheme.PRIMARY, UiTheme.WHITE);
+    private JButton loginButton = UiTheme.createRoundButton("登录", UiTheme.PRIMARY, UiTheme.WHITE);
 
-    // 退出按钮：圆角扁平样式，文字"退出"、浅灰底、深灰字
-    private JButton exitButton = UiTheme.createRoundButton("退    出", UiTheme.BG, UiTheme.TEXT_DARK);
+    // 退出按钮：圆角扁平样式，文字"退出"、白色底、深灰字（悬停加深为浅灰，描边区分背景）
+    private JButton exitButton = UiTheme.createRoundButton("退出", UiTheme.WHITE, UiTheme.TEXT_DARK);
 
     /**
      * 构造登录窗口：初始化窗口属性 + 组装界面组件
@@ -81,8 +81,8 @@ public class LoginFrame extends JFrame {
         setSize(380, 300);
         // null 表示以屏幕中心点为锚位，让窗口在整个显示器上居中显示
         setLocationRelativeTo(null);
-        // 整个内容面板背景设为纯白，配合扁平风格让窗口整体干净通透
-        getContentPane().setBackground(UiTheme.WHITE);
+        // 整个内容面板背景设为浅灰，配合扁平风格让窗口整体柔和；白色按钮靠描边与背景区分
+        getContentPane().setBackground(UiTheme.BG);
     }
 
     // 组装登录界面的标题区、表单区、按钮区，并为按钮绑定事件
@@ -107,8 +107,8 @@ public class LoginFrame extends JFrame {
     private JPanel createTitlePanel() {
         // 标题区用 BorderLayout，内部只有一个居中的标题标签
         JPanel panel = new JPanel(new BorderLayout());
-        // 标题区背景纯白，和窗口整体背景一致
-        panel.setBackground(UiTheme.WHITE);
+        // 标题区背景浅灰，和窗口整体背景一致
+        panel.setBackground(UiTheme.BG);
 
         // 创建纯文字标题标签：水平居中显示
         JLabel titleLabel = new JLabel("医药销售管理系统", JLabel.CENTER);
@@ -128,8 +128,8 @@ public class LoginFrame extends JFrame {
     private JPanel createFormPanel() {
         // 表单容器用 GridBagLayout：灵活的网格布局，让左右两列标签和输入框对齐
         JPanel panel = new JPanel(new GridBagLayout());
-        // 表单区背景纯白
-        panel.setBackground(UiTheme.WHITE);
+        // 表单区背景浅灰
+        panel.setBackground(UiTheme.BG);
         
         // 为两个输入框安装焦点边框效果：未选中浅灰 1px，选中深色 1px
         // 内边距已装进边框里（CompoundBorder），不要再调 setMargin——自定义边框后它会失效
@@ -173,8 +173,8 @@ public class LoginFrame extends JFrame {
         // vgap 不能太大：它是 SOUTH 区高度的一部分（36 + vgap*2），SOUTH 越高 CENTER 剩余越少，
         // CENTER 一旦比表单首选高度小哪怕 1px，GridBagLayout 会整体降到最小尺寸档，输入框宽度坍缩
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 38));
-        // 按钮区背景纯白
-        panel.setBackground(UiTheme.WHITE);
+        // 按钮区背景浅灰
+        panel.setBackground(UiTheme.BG);
 
         // 统一按钮尺寸：宽 100、高 36 像素，两个按钮整齐对齐
         loginButton.setPreferredSize(new Dimension(100, 36));
