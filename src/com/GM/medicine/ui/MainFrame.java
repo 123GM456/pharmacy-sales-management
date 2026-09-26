@@ -218,16 +218,10 @@ public class MainFrame extends JFrame {
         // 弹性空隙：把退出登录按钮推到导航栏最底部
         panel.add(Box.createVerticalGlue());
 
-        // ===== 退出登录：放导航栏底部，文字用浅灰表示次要操作 =====
-        JButton logoutButton = new JButton("退出登录");
-        logoutButton.setFont(UiTheme.FONT_NORMAL);
-        logoutButton.setForeground(UiTheme.TEXT_DARK); // 颜色可修改参数：UiTheme.TEXT_GRAY
-        logoutButton.setBackground(UiTheme.BG);
-        logoutButton.setFocusPainted(false);
-        logoutButton.setContentAreaFilled(false);
-        logoutButton.setOpaque(true);
-        logoutButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        logoutButton.setPreferredSize(new Dimension(100, 40)); // 可修改参数：退出登录按钮大小（宽 140 / 高 40）
+        // ===== 退出登录：放导航栏底部，圆角+描边+悬停加深样式与登录界面"退出"按钮一致 =====
+        // 用圆角按钮工厂创建：浅灰圆角底、TEXT_GRAY 描边，悬停时底色加深、描边联动变色
+        JButton logoutButton = UiTheme.createRoundButton("退出登录", UiTheme.BG, UiTheme.TEXT_DARK);
+        logoutButton.setPreferredSize(new Dimension(100, 40)); // 可修改参数：退出登录按钮大小（宽 100 / 高 40）
         logoutButton.setMaximumSize(new Dimension(100, 40)); // 与首选大小保持一致，防止被 BoxLayout 拉伸
         logoutButton.setAlignmentX(Component.CENTER_ALIGNMENT);
         logoutButton.addActionListener(new ActionListener() {
