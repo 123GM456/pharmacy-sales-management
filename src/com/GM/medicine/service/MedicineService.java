@@ -6,6 +6,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 // 导入 List：findAll 方法返回的药品集合类型
 import java.util.List;
+// 导入 ArrayList：关键词为空时返回空集合，避免无效入参传到 DAO
+import java.util.ArrayList;
 // 导入 MedicineDao：数据库访问通过它完成
 import com.GM.medicine.dao.MedicineDao;
 // 导入 Medicine：业务方法操作的药品实体类型
@@ -24,6 +26,7 @@ public class MedicineService {
     /**
      * 新增药品，新增前校验名称与销售价格
      *
+     * 
      * @param medicine 待新增的药品对象
      * @return 新增成功返回 true；名称为空、价格非法或插入失败返回 false
      */
@@ -216,6 +219,76 @@ public class MedicineService {
             System.out.println("查询过期药品：共 " + expiredMedicines.size() + " 条数据");
         }
         return expiredMedicines;
+    }
+
+    /**
+     * 按药品名称模糊查询
+     *
+     * @param keyword 名称关键词，空白时返回空集合
+     * @return 名称包含关键词的药品列表
+     */
+    public List<Medicine> findByName(String keyword) {
+        // 空白关键词不产生数据库查询，直接返回空结果
+        if (keyword == null || keyword.trim().isEmpty()) {
+            System.out.println("按名称查询药品：关键词为空");
+            return new ArrayList<>();
+        }
+        List<Medicine> medicines = medicineDao.findByName(keyword.trim());
+        if (medicines.isEmpty()) {
+            System.out.println("按名称查询药品：没有匹配的药品");
+        } else {
+            System.out.println("按名称查询药品：共 " + medicines.size() + " 条数据");
+        }
+        return medicines;
+    }
+
+    /**
+     * 按名称模糊查询可售药品：在名称匹配结果里只保留可售的药品
+     * - 可售条件与 findAvailableMedicines 的 SQL 一致：状态正常、有库存、有效期晚于今天
+     *
+     * @param keyword 名称关键词，空白时返回空集合
+     * @return 名称匹配且可售的药品列表
+     */
+    public List<Medicine> findAvailableByName(String keyword) {
+        // 空白关键词不产生数据库查询，直接返回空结果
+        if (keyword == null || keyword.trim().isEmpty()) {
+            System.out.println("按名称查询可售药品：关键词为空");
+            return new ArrayList<>();
+        }
+        // 复用 findByName 做模糊匹配，再按可售条件过滤，避免重复写一条 LIKE 查询
+        List<Medicine> medicines = medicineDao.findByName(keyword.trim());
+        List<Medicine> availableList = new ArrayList<>();
+        for (Medicine medicine : medicines) {
+            // 可售条件：状态正常、库存大于 0、有效期晚于今天（任一不满足即过滤掉）
+            if (medicine.getStatus() != null && medicine.getStatus() == 1
+                    && medicine.getStock() != null && medicine.getStock() > 0
+                    && medicine.getExpiryDate() != null && medicine.getExpiryDate().isAfter(LocalDate.now())) {
+                availableList.add(medicine);
+            }
+        }
+        System.out.println("按名称查询可售药品：共 " + availableList.size() + " 条数据");
+        return availableList;
+    }
+
+    /**
+     * 按药品类别模糊查询
+     *
+     * @param keyword 类别关键词，空白时返回空集合
+     * @return 类别包含关键词的药品列表
+     */
+    public List<Medicine> findByCategory(String keyword) {
+        // 空白关键词不产生数据库查询，直接返回空结果
+        if (keyword == null || keyword.trim().isEmpty()) {
+            System.out.println("按类别查询药品：关键词为空");
+            return new ArrayList<>();
+        }
+        List<Medicine> medicines = medicineDao.findByCategory(keyword.trim());
+        if (medicines.isEmpty()) {
+            System.out.println("按类别查询药品：没有匹配的药品");
+        } else {
+            System.out.println("按类别查询药品：共 " + medicines.size() + " 条数据");
+        }
+        return medicines;
     }
 
     public boolean checkMedicineAvailable(Integer medicineId, Integer quantity) {

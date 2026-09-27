@@ -25,6 +25,21 @@ public class Sale {
 
     private String remark; // 备注
 
+    // 药品名称（展示用）：来自联表 medicine 查询，不对应 sale 表的列，不参与写入
+    private String medicineName;
+
+    // 药品类别（展示用）：来自联表 medicine 查询，不对应 sale 表的列，不参与写入
+    private String category;
+
+    // 规格（展示用）：来自联表 medicine 查询，不对应 sale 表的列，不参与写入
+    private String specification;
+
+    // 生产厂家（展示用）：来自联表 medicine 查询，不对应 sale 表的列，不参与写入
+    private String manufacturer;
+
+    // 操作员姓名（展示用）：来自联表 sys_user 查询，不对应 sale 表的列，不参与写入
+    private String operatorName;
+
     // 加上下面的 DTO 构造器后编译器不再生成默认无参构造器，而 JDBC 从结果集还原记录时要靠它来实例化
     public Sale() {
     }
@@ -102,6 +117,46 @@ public class Sale {
 
     public void setRemark(String remark) {
         this.remark = remark;
+    }
+
+    public String getMedicineName() {
+        return medicineName;
+    }
+
+    public void setMedicineName(String medicineName) {
+        this.medicineName = medicineName;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
+    }
+
+    public String getSpecification() {
+        return specification;
+    }
+
+    public void setSpecification(String specification) {
+        this.specification = specification;
+    }
+
+    public String getManufacturer() {
+        return manufacturer;
+    }
+
+    public void setManufacturer(String manufacturer) {
+        this.manufacturer = manufacturer;
+    }
+
+    public String getOperatorName() {
+        return operatorName;
+    }
+
+    public void setOperatorName(String operatorName) {
+        this.operatorName = operatorName;
     }
 
 }

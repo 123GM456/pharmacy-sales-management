@@ -81,10 +81,11 @@ CREATE TABLE sale (
 -- =============================================================
 -- 初始化测试数据
 -- =============================================================
--- password 列存放 BCrypt 哈希串：admin 和 cashier 的明文密码均为 123456
+-- password 列存放 BCrypt 哈希串：管理员（00000）与员工（00001）的明文密码均为 123456
+-- 用户名规则：管理员固定 00000；员工由系统随机生成 00001~99999 且不重复（保留前导 0）
 INSERT INTO sys_user (username, password, real_name, phone, role, status) VALUES
-('admin',   '$2a$10$9XL7I7DSpuVoEZqopX87Wud47vWbbGfLKyjbMwz1nSHfJ3by0YfkW', '管理员', '13800138001', 1, 1),
-('cashier', '$2a$10$BSMmTPw3rTyWiFLSPpJD5uJYvvmWXzM5cCVVIQN/AjAE/RDM2zX9G', '张小明',    '13900139002', 0, 1);
+('00000', '$2a$10$9XL7I7DSpuVoEZqopX87Wud47vWbbGfLKyjbMwz1nSHfJ3by0YfkW', '管理员', '13800138001', 1, 1),
+('00001', '$2a$10$BSMmTPw3rTyWiFLSPpJD5uJYvvmWXzM5cCVVIQN/AjAE/RDM2zX9G', '张小明',    '13900139002', 0, 1);
 
 INSERT INTO medicine
     (name, category, specification, manufacturer, batch_number, purchase_price, sale_price,

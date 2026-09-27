@@ -32,10 +32,10 @@ public class Main {
         UIManager.put("PasswordField.caretForeground", Color.BLACK);
 
 
-        // 测试变量：模拟数据库初始账号 admin（角色 = ROLE_ADMIN），配合下方跳过登录直接进主界面
+        // 测试变量：模拟数据库初始账号 00000（角色 = ROLE_ADMIN），配合下方跳过登录直接进主界面
         SysUser textUser = new SysUser();
         textUser.setId(1);
-        textUser.setUserName("admin");
+        textUser.setUserName("00000");
         textUser.setRealName("管理员");
         textUser.setRole(SysUser.ROLE_ADMIN);
 

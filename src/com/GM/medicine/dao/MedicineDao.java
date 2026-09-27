@@ -314,6 +314,80 @@ public class MedicineDao implements BaseDao<Medicine> {
     }
 
     /**
+     * 按药品名称模糊查询
+     * - 使用 LIKE 实现"包含关键词"的匹配；MySQL 的 LIKE 中 % 和 _ 是通配符，关键词里出现的这类字符不做转义
+     *
+     * @param keyword 名称关键词，null 时按无效入参返回空集合
+     * @return 名称包含关键词的药品列表，没有数据时返回空集合而不是 null
+     */
+    public List<Medicine> findByName(String keyword) {
+        // 关键词为 null 时按无效入参处理，直接返回空结果，避免拼出 "%null%" 误查
+        if (keyword == null) {
+            return new ArrayList<>();
+        }
+        String sql = "SELECT id, name, category, specification, manufacturer, batch_number, purchase_price,"
+                + " sale_price, stock, warning_stock, production_date, expiry_date, status,"
+                + " created_time, updated_time FROM medicine WHERE name LIKE ? ORDER BY id";
+        List<Medicine> medicineList = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            stmt = conn.prepareStatement(sql);
+            // 前后拼 % 表示"包含关键词"的任意位置匹配，通配符在 DAO 层拼接，调用方只传原始关键词
+            stmt.setString(1, "%" + keyword + "%");
+            rs = stmt.executeQuery();
+            // 结果集可能有多行，逐行转换后加入集合
+            while (rs.next()) {
+                medicineList.add(mapRow(rs));
+            }
+        } catch (SQLException e) {
+            System.err.println("按名称查询药品失败：" + e.getMessage());
+        } finally {
+            DBUtil.close(conn, stmt, rs);
+        }
+        return medicineList;
+    }
+
+    /**
+     * 按药品类别模糊查询
+     * - 使用 LIKE 实现"包含关键词"的匹配；MySQL 的 LIKE 中 % 和 _ 是通配符，关键词里出现的这类字符不做转义
+     *
+     * @param keyword 类别关键词，null 时按无效入参返回空集合
+     * @return 类别包含关键词的药品列表，没有数据时返回空集合而不是 null
+     */
+    public List<Medicine> findByCategory(String keyword) {
+        // 关键词为 null 时按无效入参处理，直接返回空结果，避免拼出 "%null%" 误查
+        if (keyword == null) {
+            return new ArrayList<>();
+        }
+        String sql = "SELECT id, name, category, specification, manufacturer, batch_number, purchase_price,"
+                + " sale_price, stock, warning_stock, production_date, expiry_date, status,"
+                + " created_time, updated_time FROM medicine WHERE category LIKE ? ORDER BY id";
+        List<Medicine> medicineList = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            stmt = conn.prepareStatement(sql);
+            // 前后拼 % 表示"包含关键词"的任意位置匹配，通配符在 DAO 层拼接，调用方只传原始关键词
+            stmt.setString(1, "%" + keyword + "%");
+            rs = stmt.executeQuery();
+            // 结果集可能有多行，逐行转换后加入集合
+            while (rs.next()) {
+                medicineList.add(mapRow(rs));
+            }
+        } catch (SQLException e) {
+            System.err.println("按类别查询药品失败：" + e.getMessage());
+        } finally {
+            DBUtil.close(conn, stmt, rs);
+        }
+        return medicineList;
+    }
+
+    /**
      * 减少药品库存
      *
      * @param medicineId 要减少库存的药品编号

@@ -56,8 +56,14 @@ public class MainFrame extends JFrame {
     // 药品管理面板：现有面板，直接复用，业务后续在面板内部实现
     private MedicinePanel medicinePanel = new MedicinePanel();
 
-    // 销售管理面板：现有面板，直接复用，业务后续在面板内部实现
-    private SalePanel salePanel = new SalePanel();
+    // 销售管理面板：需要当前登录用户（新增销售记操作员、查询操作员），在构造方法中创建
+    private SalePanel salePanel;
+
+    // 个人信息面板：需要当前登录用户（回填与保存）与主窗口（保存后刷新顶栏），在构造方法中创建
+    private PersonalInfoPanel infoPanel;
+
+    // 顶栏右侧的用户信息标签：个人信息保存成功后通过 refreshUserBar 重新设置文字
+    private JLabel userLabel;
 
     // 内容区页面切换器：按注册名切换右侧显示的面板
     private CardLayout cardLayout = new CardLayout();
@@ -84,6 +90,10 @@ public class MainFrame extends JFrame {
     public MainFrame(SysUser currentUser) {
         // 把登录窗传过来的用户对象保存到字段上，供顶栏展示与后续页面使用
         this.currentUser = currentUser;
+        // 创建销售管理面板：必须在 currentUser 赋值之后，面板需要它确定新增销售的操作员身份
+        salePanel = new SalePanel(currentUser);
+        // 创建个人信息面板：同样依赖 currentUser，并持有主窗口引用用于保存后刷新顶栏
+        infoPanel = new PersonalInfoPanel(currentUser, this);
         // 先配窗口自身属性（标题、尺寸、关闭行为、居中）
         initFrame();
         // 再组装三块 UI 区域（顶栏 / 左导航 / 右内容区）
@@ -135,9 +145,7 @@ public class MainFrame extends JFrame {
         panel.add(titleLabel, BorderLayout.WEST);
 
         // 右侧用户信息：真实姓名 + 用户名 + 角色（不显示密码等敏感信息），次要信息用浅灰
-        JLabel userLabel = UiTheme.createLabel(
-                "当前用户：" + currentUser.getRealName()
-                        + "（" + currentUser.getUserName() + "）    角色：" + roleText(),
+        userLabel = UiTheme.createLabel(userInfoText(),
                 UiTheme.TEXT_GRAY); // 颜色可修改参数：UiTheme.TEXT_GRAY
         // 用户信息放在顶栏右侧
         panel.add(userLabel, BorderLayout.EAST);
@@ -145,7 +153,7 @@ public class MainFrame extends JFrame {
         return panel;
     }
 
-    // 创建左侧导航栏："系统菜单"小标题 + 四个页面切换按钮 + 修改密码 + 底部退出登录
+    // 创建左侧导航栏："系统菜单"小标题 + 页面切换按钮（用户管理仅管理员可见）+ 修改密码 + 底部退出登录
     private JPanel createNavPanel() {
         // 导航栏容器：BoxLayout 沿垂直方向从上往下排列
         JPanel panel = new JPanel();
@@ -204,16 +212,26 @@ public class MainFrame extends JFrame {
         JButton passwordButton = createNavButton("修改密码");
         passwordButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                // 复用现有的 PasswordDialog（表单后续在对话框内部实现）
-                PasswordDialog dialog = new PasswordDialog();
-                dialog.setTitle("修改密码");
-                dialog.setSize(400, 260); // 可修改参数：修改密码对话框初始大小（宽 400 / 高 260）
-                // 相对主窗口居中弹出
-                dialog.setLocationRelativeTo(MainFrame.this);
+                // 修改密码：传入当前登录用户，对话框内部完成表单、校验与保存
+                PasswordDialog dialog = new PasswordDialog(currentUser, MainFrame.this);
                 dialog.setVisible(true);
             }
         });
         panel.add(passwordButton);
+        panel.add(Box.createVerticalStrut(8)); // 可修改参数：菜单按钮之间的间距（8）
+
+        // ===== 用户管理：仅管理员可见（ROLE_ADMIN），放在修改密码下方，目前只预留占位页 =====
+        if (currentUser.getRole() != null && currentUser.getRole() == SysUser.ROLE_ADMIN) {
+            JButton userButton = createNavButton("用户管理");
+            userButton.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    // 注册名 "user" 必须与 createContentPanel 中 add 时的名字一致
+                    cardLayout.show(contentPanel, "user");
+                    selectNav(userButton);
+                }
+            });
+            panel.add(userButton);
+        }
 
         // 弹性空隙：把退出登录按钮推到导航栏最底部
         panel.add(Box.createVerticalGlue());
@@ -283,9 +301,12 @@ public class MainFrame extends JFrame {
         // 按注册名依次注册页面：导航按钮切换时用的名字必须与此处一致
         contentPanel.add("medicine", medicinePanel);
         contentPanel.add("sale", salePanel);
-        // 销售记录、个人信息暂无对应面板类，先放占位页预留位置，后续实现后替换
+        // 用户管理面板：传入当前登录用户（仅管理员有导航入口，见 createNavPanel），内部含禁用自己校验
+        contentPanel.add("user", new UserPanel(currentUser));
+        // 销售记录暂无对应面板类，先放占位页预留位置，后续实现后替换
         contentPanel.add("record", createPlaceholderPage("销售记录页面待实现"));
-        contentPanel.add("info", createPlaceholderPage("个人信息页面待实现"));
+        // 个人信息：已在构造方法中创建，直接注册（保存成功后通过 refreshUserBar 同步顶栏）
+        contentPanel.add("info", infoPanel);
 
         // 默认显示药品管理页，与导航栏默认选中项一致
         cardLayout.show(contentPanel, "medicine");
@@ -301,6 +322,17 @@ public class MainFrame extends JFrame {
         // 居中提示文字：次要信息浅灰（颜色可修改参数：UiTheme.TEXT_GRAY）
         page.add(UiTheme.createLabel(text, UiTheme.TEXT_GRAY));
         return page;
+    }
+
+    // 组装顶栏用户信息文字：真实姓名（用户名）+ 角色，创建顶栏与刷新时共用
+    private String userInfoText() {
+        return "当前用户：" + currentUser.getRealName()
+                + "（" + currentUser.getUserName() + "）    角色：" + roleText();
+    }
+
+    // 刷新顶栏用户信息：个人信息保存成功后由 PersonalInfoPanel 调用，保持顶栏姓名与最新数据一致
+    public void refreshUserBar() {
+        userLabel.setText(userInfoText());
     }
 
     // 把 SysUser 实体里的 role 数值（1 / 0）转换成界面上的中文名称

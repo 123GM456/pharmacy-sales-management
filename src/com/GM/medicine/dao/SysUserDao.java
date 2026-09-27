@@ -214,6 +214,132 @@ public class SysUserDao implements BaseDao<SysUser> {
     }
 
     /**
+     * 按角色查询用户列表（用户管理页"管理员/员工"分类用）
+     *
+     * @param role 角色值：ROLE_ADMIN（1）或 ROLE_STAFF（0）
+     * @return 用户列表，没有数据时返回空集合而不是 null
+     */
+    public List<SysUser> findByRole(int role) {
+        return queryByIntColumn("role", role);
+    }
+
+    /**
+     * 按状态查询用户列表（用户管理页"禁用用户"分类用）
+     *
+     * @param status 状态值：STATUS_ENABLED（1）或 STATUS_DISABLED（0）
+     * @return 用户列表，没有数据时返回空集合而不是 null
+     */
+    public List<SysUser> findByStatus(int status) {
+        return queryByIntColumn("status", status);
+    }
+
+    /**
+     * 按指定列模糊查询用户（用户管理页关键词查询用）
+     * - 关键词前后拼 % 做模糊匹配
+     *
+     * @param keyword 查询关键词
+     * @param field   查询维度：username（用户名）/ real_name（姓名）/ phone（手机号）
+     * @return 用户列表，没有数据或维度非法时返回空集合而不是 null
+     */
+    public List<SysUser> findByNameLike(String keyword, String field) {
+        // 关键词为空时不可能命中任何记录，直接返回空集合，省一次数据库访问
+        if (keyword == null || keyword.isEmpty()) {
+            return new ArrayList<>();
+        }
+        // 列名白名单：只允许三个固定维度，防止把外部输入直接拼进 SQL 造成注入
+        String column;
+        if ("username".equals(field)) {
+            column = "username";
+        } else if ("real_name".equals(field)) {
+            column = "real_name";
+        } else if ("phone".equals(field)) {
+            column = "phone";
+        } else {
+            return new ArrayList<>();
+        }
+        String sql = "SELECT id, username, password, real_name, phone, role, status,"
+                + " created_time, updated_time FROM sys_user WHERE " + column + " LIKE ? ORDER BY id";
+        List<SysUser> sysUserList = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            stmt = conn.prepareStatement(sql);
+            // 关键词通过占位符绑定，只有列名来自白名单
+            stmt.setString(1, "%" + keyword + "%");
+            rs = stmt.executeQuery();
+            // 结果集可能有多行，逐行转换后加入集合
+            while (rs.next()) {
+                sysUserList.add(mapRow(rs));
+            }
+        } catch (SQLException e) {
+            System.err.println("模糊查询用户失败：" + e.getMessage());
+        } finally {
+            DBUtil.close(conn, stmt, rs);
+        }
+        return sysUserList;
+    }
+
+    /**
+     * 通用按整型列查询：供 findByRole / findByStatus 复用，列名只由本类内部固定传入，无注入风险
+     *
+     * @param column 固定列名（role / status）
+     * @param value  列值
+     * @return 用户列表，没有数据时返回空集合而不是 null
+     */
+    private List<SysUser> queryByIntColumn(String column, int value) {
+        String sql = "SELECT id, username, password, real_name, phone, role, status,"
+                + " created_time, updated_time FROM sys_user WHERE " + column + " = ? ORDER BY id";
+        List<SysUser> sysUserList = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            stmt = conn.prepareStatement(sql);
+            stmt.setInt(1, value);
+            rs = stmt.executeQuery();
+            while (rs.next()) {
+                sysUserList.add(mapRow(rs));
+            }
+        } catch (SQLException e) {
+            System.err.println("按列查询用户失败：" + e.getMessage());
+        } finally {
+            DBUtil.close(conn, stmt, rs);
+        }
+        return sysUserList;
+    }
+
+    /**
+     * 只更新指定用户的状态（用户管理页启用/禁用用）
+     * - 不复用 update 方法：整行更新会把姓名、手机号一起覆盖
+     * - 与 updatePassword 同理，单列更新更安全
+     *
+     * @param id     用户编号
+     * @param status 新状态：STATUS_ENABLED（1）或 STATUS_DISABLED（0）
+     * @return 修改成功返回 true，失败返回 false
+     */
+    public boolean updateStatus(int id, int status) {
+        // updated_time 列没有 ON UPDATE 属性，修改状态同样需要显式刷新
+        String sql = "UPDATE sys_user SET status = ?, updated_time = NOW() WHERE id = ?";
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        try {
+            conn = DBUtil.getConnection();
+            stmt = conn.prepareStatement(sql);
+            stmt.setInt(1, status);
+            stmt.setInt(2, id);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("修改用户状态失败：" + e.getMessage());
+            return false;
+        } finally {
+            DBUtil.close(conn, stmt);
+        }
+    }
+
+    /**
      * 只更新指定用户的密码
      * - 不复用 update 方法：整行更新会把用户名、角色等字段一起覆盖
      * - 密码修改是高频且敏感的操作，单独一条 SQL 更安全也更高效

@@ -47,10 +47,10 @@ public class LoginFrame extends JFrame {
     private SysUserService sysUserService = new SysUserService();
 
     // 用户名输入框：参数 16 是推荐列数，实际宽度由 GridBagLayout 决定
-    private JTextField userNameField = new JTextField(16);
+    private JTextField userNameField = UiTheme.createTextField(16);
 
     // 密码输入框：同上，内部自带密码遮罩（默认圆点）
-    private JPasswordField passwordField = new JPasswordField(16);
+    private JPasswordField passwordField = UiTheme.createPasswordField(16);
 
     // 登录按钮：圆角扁平样式，文字"登录"、主题绿实心背景、白色字
     private JButton loginButton = UiTheme.createRoundButton("登录", UiTheme.PRIMARY, UiTheme.WHITE);

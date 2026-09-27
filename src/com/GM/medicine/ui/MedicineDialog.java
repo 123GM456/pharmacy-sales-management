@@ -192,7 +192,7 @@ public class MedicineDialog extends JDialog {
 
     // 创建统一风格的输入框：静态浅灰圆角边框，与登录界面一致
     private JTextField createInputField() {
-        JTextField field = new JTextField();
+        JTextField field = UiTheme.createTextField(0);
         // 静态圆角边框：浅灰 1px，复用 UiTheme 绘制（焦点变色效果已取消）
         field.setOpaque(false);
         field.setBorder(UiTheme.roundBorder(UiTheme.TEXT_GRAY, 1));

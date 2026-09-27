@@ -324,10 +324,58 @@ public final class UiTheme {
     }
 
     /**
+     * 创建圆角白底输入框：内部先自绘圆角白色底再画文字，配合 roundBorder 圆角线组成完整的圆角输入框
+     * 背景：白底。为什么自绘：输入框必须 setOpaque(false) 才不会被直角白底截断圆角线，
+     * 透明后透出的是父容器底色（登录窗浅灰、对话框白色，不统一），所以白底也要按圆角自绘
+     *
+     * @param columns 推荐列数（估算宽度用），0 表示不限制
+     * @return 圆角白底的文本输入框
+     */
+    public static javax.swing.JTextField createTextField(int columns) {
+        javax.swing.JTextField field = new javax.swing.JTextField(columns) {
+            public void paintComponent(Graphics g) {
+                // 先画圆角白底再画文字：顺序反了会用白底盖住文字
+                paintRoundBackground(this, g);
+                super.paintComponent(g);
+            }
+        };
+        return field;
+    }
+
+    /**
+     * 创建圆角白底密码框：与 createTextField 同一套圆角白底自绘，仅输入内容以圆点显示
+     *
+     * @param columns 推荐列数（估算宽度用），0 表示不限制
+     * @return 圆角白底的密码输入框
+     */
+    public static javax.swing.JPasswordField createPasswordField(int columns) {
+        javax.swing.JPasswordField field = new javax.swing.JPasswordField(columns) {
+            public void paintComponent(Graphics g) {
+                // 先画圆角白底再画文字：顺序反了会用白底盖住文字
+                paintRoundBackground(this, g);
+                super.paintComponent(g);
+            }
+        };
+        return field;
+    }
+
+    // 画圆角白色底：输入框与密码框共用的底色绘制，圆角半径与 roundBorder 保持一致
+    // 参数 c 用于取组件当前宽高（每帧可能变化），g 为组件传入的画布
+    private static void paintRoundBackground(javax.swing.JComponent c, Graphics g) {
+        Graphics2D g2 = (Graphics2D) g.create();
+        // 开抗锯齿：圆角边缘平滑
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setColor(WHITE); // 可修改参数：输入框内部底色（白）
+        // 圆角半径 10 与 roundBorder 一致（想调整弧度两处一起改）；宽高各内收 1px，底色不溢出圆角描边
+        g2.fillRoundRect(0, 0, c.getWidth() - 1, c.getHeight() - 1, 10, 10);
+        g2.dispose();
+    }
+
+    /**
      * 为输入框安装焦点边框效果：未选中时浅灰 1px 圆角线，选中时深色 1px 圆角线
      * 圆角线由 roundBorder 自绘（Swing 没有现成的圆角边框），留白直接并入边框 insets
      * 关键前提：必须关闭组件的不透明填充——JTextField 默认的直角白底会盖住圆角外的三角区域，
-     * setOpaque(false) 后透出父面板的白底，视觉上才是真正的圆角
+     * setOpaque(false) 后由组件自绘的圆角白底负责背景（见 createTextField / createPasswordField）
      *
      * @param component 要安装效果的组件（JTextField / JPasswordField 等）
      */

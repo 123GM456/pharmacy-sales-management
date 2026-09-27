@@ -4,6 +4,12 @@ package com.GM.medicine.service;
 import org.mindrot.jbcrypt.BCrypt;
 // 导入 ArrayList：无权限时返回空集合的实例化类型
 import java.util.ArrayList;
+// 导入 HashSet：记录已尝试过的员工号码，避免重复查库与死循环
+import java.util.HashSet;
+// 导入 Random：随机生成员工用户名号码
+import java.util.Random;
+// 导入 Set：已尝试号码集合的类型
+import java.util.Set;
 // 导入 List：findAll 方法返回的用户集合类型
 import java.util.List;
 // 导入 SysUserDao：业务方法通过它读写 sys_user 表
@@ -23,6 +29,9 @@ public class SysUserService {
 
     // 新增用户的初始明文密码，入库前统一经 BCrypt 哈希
     private static final String DEFAULT_PASSWORD = "123456";
+
+    // 管理员的固定用户名：系统只此一个管理员账号，保留前导 0 按 String 处理
+    private static final String ADMIN_USERNAME = "00000";
 
     // 数据访问对象，负责真正读写数据库，业务规则校验通过后才调用它
     private SysUserDao sysUserDao = new SysUserDao();
@@ -215,12 +224,102 @@ public class SysUserService {
     }
 
     /**
+     * 管理员按角色查询用户（用户管理页"管理员/员工"分类用）
+     *
+     * @param currentUser 当前登录用户
+     * @param role        角色值：ROLE_ADMIN（1）或 ROLE_STAFF（0）
+     * @return 用户列表；无权限时返回空集合，没有数据时同样为空集合
+     */
+    public List<SysUser> findByRole(SysUser currentUser, int role) {
+        if (!isAdmin(currentUser)) {
+            System.out.println("按角色查询用户失败：没有管理员权限");
+            return new ArrayList<>();
+        }
+        List<SysUser> sysUserList = sysUserDao.findByRole(role);
+        System.out.println("按角色查询用户，共 " + sysUserList.size() + " 条");
+        return sysUserList;
+    }
+
+    /**
+     * 管理员按状态查询用户（用户管理页"禁用用户"分类用）
+     *
+     * @param currentUser 当前登录用户
+     * @param status      状态值：STATUS_ENABLED（1）或 STATUS_DISABLED（0）
+     * @return 用户列表；无权限时返回空集合，没有数据时同样为空集合
+     */
+    public List<SysUser> findByStatus(SysUser currentUser, int status) {
+        if (!isAdmin(currentUser)) {
+            System.out.println("按状态查询用户失败：没有管理员权限");
+            return new ArrayList<>();
+        }
+        List<SysUser> sysUserList = sysUserDao.findByStatus(status);
+        System.out.println("按状态查询用户，共 " + sysUserList.size() + " 条");
+        return sysUserList;
+    }
+
+    /**
+     * 管理员按关键词模糊查询用户（用户管理页关键词查询用）
+     *
+     * @param currentUser 当前登录用户
+     * @param keyword     查询关键词
+     * @param field       查询维度：username（用户名）/ real_name（姓名）/ phone（手机号）
+     * @return 用户列表；无权限、关键词为空或维度非法时返回空集合
+     */
+    public List<SysUser> findUsersByKeyword(SysUser currentUser, String keyword, String field) {
+        if (!isAdmin(currentUser)) {
+            System.out.println("关键词查询用户失败：没有管理员权限");
+            return new ArrayList<>();
+        }
+        // 关键词去掉首尾空格后为空则不查数据库，直接返回空集合
+        String trimmed = keyword == null ? "" : keyword.trim();
+        if (trimmed.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<SysUser> sysUserList = sysUserDao.findByNameLike(trimmed, field);
+        System.out.println("关键词查询用户，共 " + sysUserList.size() + " 条");
+        return sysUserList;
+    }
+
+    /**
+     * 管理员启用/禁用用户（用户管理页状态按钮用）
+     * - 管理员不能把自己禁用，防止把当前登录账号锁在系统外
+     *
+     * @param currentUser 当前登录用户
+     * @param targetId    目标用户编号
+     * @param status      新状态：STATUS_ENABLED（1）或 STATUS_DISABLED（0）
+     * @return 修改成功返回 true；无权限、编号为空、把自己禁用或更新失败返回 false
+     */
+    public boolean updateStatus(SysUser currentUser, Integer targetId, int status) {
+        if (!isAdmin(currentUser)) {
+            System.out.println("修改用户状态失败：没有管理员权限");
+            return false;
+        }
+        if (targetId == null) {
+            System.out.println("修改用户状态失败：用户编号为空");
+            return false;
+        }
+        // 禁用目标只能是其他用户：把自己禁用会导致当前会话无账号可用，提前拦截
+        if (status == SysUser.STATUS_DISABLED && targetId.equals(currentUser.getId())) {
+            System.out.println("修改用户状态失败：不能禁用当前登录账号");
+            return false;
+        }
+        boolean result = sysUserDao.updateStatus(targetId, status);
+        if (result) {
+            System.out.println("修改用户状态成功：编号 " + targetId + "，新状态 " + status);
+        } else {
+            System.out.println("修改用户状态失败：用户不存在或数据库更新失败");
+        }
+        return result;
+    }
+
+    /**
      * 管理员新增用户
+     * - 用户名由系统自动生成：管理员固定 00000，员工从 00001~99999 随机取未占用号码，调用方不能指定
      * - 角色、状态使用数据库默认值；初始密码由本方法生成并哈希后交给 DAO 保存
      *
      * @param currentUser 当前登录用户
-     * @param sysUser     待新增的用户对象，只需提供用户名、真实姓名、手机号
-     * @return 新增成功返回 true；无权限、字段为空、用户名已被占用或插入失败返回 false
+     * @param sysUser     待新增的用户对象，只需提供真实姓名、手机号
+     * @return 新增成功返回 true；无权限、字段为空、用户名生成失败或插入失败返回 false
      */
     public boolean addUser(SysUser currentUser, SysUser sysUser) {
         if (!isAdmin(currentUser)) {
@@ -231,11 +330,7 @@ public class SysUserService {
             System.out.println("新增用户失败：用户对象不能为空");
             return false;
         }
-        // 检查非空字段是否为空
-        if (sysUser.getUserName() == null || sysUser.getUserName().isEmpty()) {
-            System.out.println("新增用户失败：用户名为空");
-            return false;
-        }
+        // 检查非空字段是否为空（用户名由本方法生成，不在校验范围内）
         if (sysUser.getRealName() == null || sysUser.getRealName().isEmpty()) {
             System.out.println("新增用户失败：真实姓名为空");
             return false;
@@ -244,11 +339,25 @@ public class SysUserService {
             System.out.println("新增用户失败：手机号为空");
             return false;
         }
-        // username 列有唯一索引，先查重能明确失败原因，而不是等数据库报约束冲突
-        if (sysUserDao.findByUserName(sysUser.getUserName()) != null) {
-            System.out.println("新增用户失败：用户名已存在");
-            return false;
+        // 用户名按角色生成：管理员固定 00000；员工（含 role 为空走数据库默认值的情况）随机生成
+        String username;
+        if (sysUser.getRole() != null && sysUser.getRole() == SysUser.ROLE_ADMIN) {
+            // 管理员用户名固定：已被占用说明系统已存在管理员账号，直接失败
+            if (sysUserDao.findByUserName(ADMIN_USERNAME) != null) {
+                System.out.println("新增用户失败：管理员账号已存在");
+                return false;
+            }
+            username = ADMIN_USERNAME;
+        } else {
+            // 员工用户名随机生成，区间全部占用时给出明确失败，不无限循环
+            username = generateStaffUsername();
+            if (username == null) {
+                System.out.println("新增用户失败：00001~99999 员工用户名已全部占用");
+                return false;
+            }
         }
+        // 把生成的用户名写回实体，DAO 原样入库（username 列唯一约束兜底）
+        sysUser.setUserName(username);
         // 初始密码在 Service 层完成 BCrypt 哈希，DAO 只负责原样入库
         sysUser.setPassword(hashPassword(DEFAULT_PASSWORD));
         boolean result = sysUserDao.add(sysUser);
@@ -258,6 +367,35 @@ public class SysUserService {
             System.out.println("新增用户失败：数据库写入失败");
         }
         return result;
+    }
+
+    /**
+     * 随机生成一个未被占用的员工用户名（00001~99999，保留前导 0 的五位数字字符串）
+     * - 生成后查库确认不存在，已占用则重新生成
+     * - 用集合记录已尝试过的号码，每个号码最多查库一次，保证有限次内结束、不会死循环
+     *
+     * @return 可用的五位数字用户名；00001~99999 全部被占用时返回 null
+     */
+    private String generateStaffUsername() {
+        // 已尝试过的号码集合：既避免同一号码反复查库，也作为生成结束的条件
+        Set<Integer> tried = new HashSet<>();
+        Random random = new Random();
+        // 最多把区间内每个号码尝试一次，全部占用时结束循环
+        while (tried.size() < 99999) {
+            // 随机取 1~99999，格式化为五位数字（不足五位前补 0，如 1 → "00001"）
+            int number = random.nextInt(99999) + 1;
+            // add 返回 false 说明该号码已尝试过，重新抽取
+            if (!tried.add(number)) {
+                continue;
+            }
+            String username = String.format("%05d", number);
+            // 号码未被占用即命中；已占用则继续尝试下一个号码
+            if (sysUserDao.findByUserName(username) == null) {
+                return username;
+            }
+        }
+        // 走到这里说明 00001~99999 已全部占用，返回 null 由调用方给出明确提示
+        return null;
     }
 
     /**
