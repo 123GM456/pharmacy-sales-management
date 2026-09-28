@@ -252,6 +252,37 @@ public class MedicineDao implements BaseDao<Medicine> {
     }
 
     /**
+     * 查询所有停用药品
+     * - 只按状态筛选：status = 0，不限库存与有效期
+     *
+     * @return 所有停用药品的列表
+     */
+    public List<Medicine> findDisabledMedicines() {
+        String sql = "SELECT id, name, category, specification, manufacturer, batch_number, purchase_price,"
+                + " sale_price, stock, warning_stock, production_date, expiry_date, status,"
+                + " created_time, updated_time FROM medicine"
+                + " WHERE status = 0 ORDER BY id";
+        List<Medicine> disabledMedicines = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DBUtil.getConnection();
+            stmt = conn.prepareStatement(sql);
+            rs = stmt.executeQuery();
+            // 结果集可能有多行，逐行转换后加入集合
+            while (rs.next()) {
+                disabledMedicines.add(mapRow(rs));
+            }
+        } catch (SQLException e) {
+            System.err.println("查询所有停用药品失败：" + e.getMessage());
+        } finally {
+            DBUtil.close(conn, stmt, rs);
+        }
+        return disabledMedicines;
+    }
+
+    /**
      * 查询所有预警药品
      * - 预警需同时满足：状态正常、库存大于 0、未过期、库存低于预警值
      *
@@ -385,6 +416,28 @@ public class MedicineDao implements BaseDao<Medicine> {
             DBUtil.close(conn, stmt, rs);
         }
         return medicineList;
+    }
+
+    /**
+     * 按编号更新药品状态（药品管理页"启用/停用"按钮用）
+     * - 单列更新：只改 status，不覆盖其他字段，与整行 update 分开
+     * - updated_time 列没有 ON UPDATE 属性，因此需要在此显式刷新为当前时间
+     *
+     * @param medicineId 药品编号
+     * @param status     目标状态：1 在售，0 停用
+     * @return 更新成功返回 true，失败返回 false
+     */
+    public boolean updateStatus(Integer medicineId, int status) {
+        String sql = "UPDATE medicine SET status = ?, updated_time = NOW() WHERE id = ?";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, status);
+            stmt.setInt(2, medicineId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("更新药品状态失败：" + e.getMessage());
+            return false;
+        }
     }
 
     /**

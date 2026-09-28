@@ -38,12 +38,15 @@ import com.GM.medicine.pojo.entity.SysUser;
 import com.GM.medicine.ui.MedicinePanel;
 // 导入 SalePanel：销售管理模块面板（现有面板，直接复用）
 import com.GM.medicine.ui.SalePanel;
+// 导入 StockWarningThread：登录进入主窗口后启动的库存预警后台线程，本类负责它的启动与停止
+import com.GM.medicine.thread.StockWarningThread;
 
 /**
  * - 主窗口
  * - 登录成功后由 LoginFrame 创建，负责顶部用户展示、左侧功能导航、右侧页面切换
  * - 通过构造方法接收当前登录用户对象，不重新查询数据库，也不构造虚假用户
  * - 只承担窗口、导航与页面切换：不写 SQL、不做业务计算，各页面业务由对应面板通过 Service 完成
+ * - 登录期间持有库存预警后台线程：构造末尾启动、退出登录时停止，并提供预警页跳转入口
  * - 界面的颜色、字体统一在 UiTheme 常量中修改；本类中的尺寸、间距、组件大小都在"可修改参数"注释处调整
  */
 public class MainFrame extends JFrame {
@@ -72,6 +75,18 @@ public class MainFrame extends JFrame {
     // 当前选中的导航按钮：切换菜单时用它把上一个按钮的边框恢复为普通样式
     private JButton selectedNav;
 
+    // 药品管理导航按钮：库存预警入口点击跳转时要同步它的选中态，提升为字段供 showMedicineWarningPage 使用
+    private JButton medicineNavButton;
+
+    // 导航栏容器：库存预警入口文字变化后需要重新布局，提升为字段供 showStockWarning 使用
+    private JPanel navPanel;
+
+    // 库存预警入口按钮：有预警时显示"库存预警"可点击跳转，无预警时显示"无预警"且禁用；状态由 StockWarningThread 经 EDT 更新
+    private JButton warningNavButton;
+
+    // 库存预警后台线程：登录期间定时检查预警药品，退出登录时停止；构造方法末尾创建并启动
+    private StockWarningThread stockWarningThread;
+
     // 导航按钮普通态边框：1px 浅灰圆角细线（外围补 1px 空白），未选中时一直显示，复用 UiTheme 绘制与输入框统一
     private Border navNormalBorder = BorderFactory.createCompoundBorder(
             BorderFactory.createEmptyBorder(1, 1, 1, 1),
@@ -96,6 +111,10 @@ public class MainFrame extends JFrame {
         initFrame();
         // 再组装三块 UI 区域（顶栏 / 左导航 / 右内容区）
         initComponents();
+        // 最后启动库存预警后台线程：界面就绪后再开查，保证线程弹提示时主窗口已可见；
+        // 构造方法每个主窗口实例只执行一次，不会重复 start
+        stockWarningThread = new StockWarningThread(this);
+        stockWarningThread.start();
     }
 
     // 设置窗口标题、尺寸、关闭行为，并让窗口显示在屏幕中央
@@ -156,6 +175,8 @@ public class MainFrame extends JFrame {
         // 导航栏容器：BoxLayout 沿垂直方向从上往下排列
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        // 保存到字段：库存预警入口显隐后要用它重新布局（showStockWarning）
+        navPanel = panel;
         // 导航栏底色浅灰，和内容区一致；选中菜单用白色卡片区分（颜色可修改参数：UiTheme.BG）
         panel.setBackground(UiTheme.BG);
         // 外层右侧 1px 分割线（把导航区和内容区分开）+ 内层四周留白
@@ -173,15 +194,15 @@ public class MainFrame extends JFrame {
         panel.add(Box.createVerticalStrut(8)); // 可修改参数：小标题与菜单按钮的间距（8）
 
         // ===== 四个页面切换按钮：点击后切换右侧内容区并更新选中态 =====
-        JButton medicineButton = createNavButton("药品管理");
-        medicineButton.addActionListener(new ActionListener() {
+        medicineNavButton = createNavButton("药品管理");
+        medicineNavButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 // 注册名 "medicine" 必须与 createContentPanel 中 add 时的名字一致
                 cardLayout.show(contentPanel, "medicine");
-                selectNav(medicineButton);
+                selectNav(medicineNavButton);
             }
         });
-        panel.add(medicineButton);
+        panel.add(medicineNavButton);
         panel.add(Box.createVerticalStrut(8)); // 可修改参数：菜单按钮之间的间距（8）
 
         JButton saleButton = createNavButton("销售管理");
@@ -219,7 +240,23 @@ public class MainFrame extends JFrame {
             panel.add(userButton);
         }
 
-        // 弹性空隙：把退出登录按钮推到导航栏最底部
+        // 上半段弹性空隙：与下半段均分剩余空间，把库存预警入口推到导航按钮与退出登录的中点
+        panel.add(Box.createVerticalGlue());
+
+        // ===== 库存预警入口：有预警显示"库存预警"可点击，无预警显示"无预警"且禁用 =====
+        // 样式与导航菜单按钮完全一致（复用 createNavButton 工厂）；不参与 selectNav 选中态管理
+        warningNavButton = createNavButton("无预警");
+        // 登录后线程首轮检查前先按无预警处理：显示"无预警"且禁用，无跳转功能
+        warningNavButton.setEnabled(false);
+        warningNavButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                // 与预警线程的跳转逻辑一致：切到药品管理页并选中预警药品分类
+                showMedicineWarningPage();
+            }
+        });
+        panel.add(warningNavButton);
+
+        // 下半段弹性空隙：两个 glue 均分剩余空间，退出登录仍贴最底部，预警入口停在正中间
         panel.add(Box.createVerticalGlue());
 
         // ===== 退出登录：放导航栏底部，圆角+描边+悬停加深样式与登录界面"退出"按钮一致 =====
@@ -236,7 +273,7 @@ public class MainFrame extends JFrame {
         panel.add(logoutButton);
 
         // 默认选中"药品管理"，和内容区默认显示的页面（见 createContentPanel）保持一致
-        selectNav(medicineButton);
+        selectNav(medicineNavButton);
         return panel;
     }
 
@@ -321,6 +358,27 @@ public class MainFrame extends JFrame {
         userLabel.setText(userInfoText());
     }
 
+    // 切换到药品管理页：库存预警弹窗中用户点击"查看"后由 StockWarningThread 经 EDT 调用
+    public void showMedicineWarningPage() {
+        // 切换右侧内容区到药品管理页（注册名与 createContentPanel 中一致）
+        cardLayout.show(contentPanel, "medicine");
+        // 同步左侧导航选中态，避免页面已切换而菜单仍停留在旧选项
+        selectNav(medicineNavButton);
+        // 药品面板切到"预警药品"分类并刷新表格，让用户直接看到预警药品列表
+        medicinePanel.selectWarningCategory();
+    }
+
+    // 更新导航栏预警入口：有预警显示"库存预警"可点击跳转，无预警显示"无预警"且禁用；由 StockWarningThread 经 EDT 调用
+    public void showStockWarning(boolean hasWarning) {
+        // 文字与可用性每轮按最新结果设置，重复调用是幂等的
+        warningNavButton.setText(hasWarning ? "库存预警" : "无预警");
+        // 无预警时禁用按钮：没有跳转功能
+        warningNavButton.setEnabled(hasWarning);
+        // 文字宽度变化可能影响布局，重新布局并重绘一次保证即时生效
+        navPanel.revalidate();
+        navPanel.repaint();
+    }
+
     // 把 SysUser 实体里的 role 数值（1 / 0）转换成界面上的中文名称
     // SysUser.ROLE_ADMIN = 1（管理员）、SysUser.ROLE_STAFF = 0（普通用户）
     private String roleText() {
@@ -339,6 +397,12 @@ public class MainFrame extends JFrame {
         // 非"确定"都不执行退出
         if (!confirmed) {
             return;
+        }
+        // 先停止库存预警线程：会话已结束，后台线程不能带着旧会话继续查库、弹提示
+        if (stockWarningThread != null) {
+            stockWarningThread.stopThread();
+            // 引用置空：旧线程对象可被回收，也为下次登录留出干净状态
+            stockWarningThread = null;
         }
         // dispose() 只关闭主窗口，不结束 JVM；随后重新打开登录窗
         dispose();

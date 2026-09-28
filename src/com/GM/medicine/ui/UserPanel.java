@@ -55,6 +55,7 @@ import com.GM.medicine.service.SysUserService;
  * - 工具栏提供用户名 / 姓名 / 手机号三种模糊查询与新增用户入口
  * - 表格行尾"启用/禁用"与"重置密码"两列操作按钮：分别切换该行用户状态、确认后重置为默认密码
  * - 数据获取全部通过 SysUserService 完成，本类不写 SQL；不提供删除、修改功能
+ * - 底部分页栏每页 50 条：滚轮翻页保留，另加上一页/下一页与页码跳转；切换分类或搜索回到第 1 页，行内操作保持当前页
  */
 public class UserPanel extends JPanel {
 
@@ -68,7 +69,7 @@ public class UserPanel extends JPanel {
     private final String[] categoryItems = {"全部用户", "管理员", "员工", "禁用用户"};
 
     // 表格列名：数据的各个字段 + 行尾两列操作列，字段列均只读展示
-    private final String[] columnNames = {"用户名", "姓名", "手机号", "角色", "状态", "创建时间", "修改时间", "启用/禁用", "重置密码"};
+    private final String[] columnNames = {"用户名", "姓名", "手机号", "角色", "状态", "创建时间", "修改时间", "状态", "重置密码"};
 
     // 表格数据模型：只有行尾两列操作列可编辑（用于触发行内按钮）
     private final DefaultTableModel tableModel = new DefaultTableModel(columnNames, 0) {
@@ -108,6 +109,13 @@ public class UserPanel extends JPanel {
     // 当前选中的分类标识：all / admin / staff / disabled，新增或操作成功后按它刷新
     private String currentKey = "all";
 
+    // 底部分页栏：每页显示 50 条（可修改参数：每页条数 50），页码变化时回调 refreshTable 重绘当前页
+    private PageBar pageBar = new PageBar(50, new Runnable() {
+        public void run() {
+            refreshTable();
+        }
+    });
+
     /**
      * 构造用户管理面板：保存登录用户 + 组装分类栏与列表区，默认加载"全部用户"
      *
@@ -143,22 +151,43 @@ public class UserPanel extends JPanel {
         return "all";
     }
 
-    // 按分类标识加载用户：key 与下拉框选项一一对应，分别调用对应 Service 方法
+    // 按分类标识加载用户并回到第 1 页：key 与下拉框选项一一对应
     private void loadCategory(String key) {
         // 记住当前分类：新增或操作成功后按它刷新，保持用户所在视角
         currentKey = key;
-        // 按标识调用对应的 Service 查询方法
-        if ("admin".equals(key)) {
+        // 装载当前分类的数据
+        loadCategoryData();
+        // 数据变化后回到第 1 页：切换分类视为重新浏览
+        pageBar.setTotal(displayList.size());
+        // 加载完成刷新表格
+        refreshTable();
+    }
+
+    // 按当前分类标识调用对应 Service 方法装载数据（不刷新表格、不动页码）
+    private void loadCategoryData() {
+        if ("admin".equals(currentKey)) {
             displayList = userService.findByRole(currentUser, SysUser.ROLE_ADMIN);
-        } else if ("staff".equals(key)) {
+        } else if ("staff".equals(currentKey)) {
             displayList = userService.findByRole(currentUser, SysUser.ROLE_STAFF);
-        } else if ("disabled".equals(key)) {
+        } else if ("disabled".equals(currentKey)) {
             displayList = userService.findByStatus(currentUser, SysUser.STATUS_DISABLED);
         } else {
             displayList = userService.findAll(currentUser);
         }
-        // 加载完成刷新表格
+    }
+
+    // 重新装载当前分类数据并保持当前页码：行内按钮操作、对话框关闭后调用，避免页码跳回第 1 页
+    private void reloadKeepPage() {
+        // 装载当前分类的数据
+        loadCategoryData();
+        // 更新总条数并保持当前页（当前页越界时收敛到最后一页）
+        pageBar.setTotalKeepPage(displayList.size());
         refreshTable();
+    }
+
+    // 把表格行号换算成 displayList 下标：表格只显示当前页数据，需加上页首偏移
+    private int toListIndex(int row) {
+        return (pageBar.getCurrentPage() - 1) * pageBar.getPageSize() + row;
     }
 
     // 按下拉框选中的类型执行数据库模糊查询；关键词为空时弹提示要求输入
@@ -180,11 +209,13 @@ public class UserPanel extends JPanel {
             field = "phone";
         }
         displayList = userService.findUsersByKeyword(currentUser, keyword, field);
+        // 搜索结果视为重新浏览：更新总条数并回到第 1 页
+        pageBar.setTotal(displayList.size());
         // 查询完成刷新表格
         refreshTable();
     }
 
-    // 用 displayList 的数据刷新表格行；创建时间格式化为 yyyy-MM-dd HH:mm 文本
+    // 用 displayList 当前页的数据刷新表格行；创建时间格式化为 yyyy-MM-dd HH:mm 文本
     private void refreshTable() {
         // 清空旧行后逐行填充
         tableModel.setRowCount(0);
@@ -194,7 +225,12 @@ public class UserPanel extends JPanel {
         if (displayList == null) {
             return;
         }
-        for (SysUser user : displayList) {
+        // 计算当前页的数据区间：[页首下标, min(页尾下标, 总条数))
+        int from = (pageBar.getCurrentPage() - 1) * pageBar.getPageSize();
+        int to = Math.min(from + pageBar.getPageSize(), displayList.size());
+        // 只填充当前页区间内的用户
+        for (int i = from; i < to; i++) {
+            SysUser user = displayList.get(i);
             tableModel.addRow(new Object[]{
                     user.getUserName(),
                     user.getRealName(),
@@ -265,8 +301,9 @@ public class UserPanel extends JPanel {
         table.getColumnModel().getColumn(7).setCellRenderer(new TableCellRenderer() {
             public Component getTableCellRendererComponent(JTable t, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
                 // 按钮文字随该行用户状态变化：正常 → "禁用"，已禁用 → "启用"
-                if (displayList != null && row >= 0 && row < displayList.size()) {
-                    SysUser target = displayList.get(row);
+                if (displayList != null && row >= 0 && toListIndex(row) < displayList.size()) {
+                    // 表格行号加上页首偏移才是列表下标
+                    SysUser target = displayList.get(toListIndex(row));
                     renderStatusButton.setText(target.getStatus() != null && target.getStatus() == SysUser.STATUS_ENABLED ? "禁用" : "启用");
                 }
                 // 鼠标悬停在当前行该按钮上时底色加深，与"新增药品"按钮悬停效果一致；移开后恢复主题绿
@@ -292,7 +329,8 @@ public class UserPanel extends JPanel {
 
     // 启用/禁用指定行用户：点击操作列按钮后把 status 切换为 0 或 1，按钮文字随新状态变化
     private void toggleStatus(int row) {
-        SysUser target = displayList.get(row);
+        // 表格行号加上页首偏移才是列表下标
+        SysUser target = displayList.get(toListIndex(row));
         // 管理员不能禁用自己（Service 同样兜底校验）
         if (target.getId() != null && target.getId().equals(currentUser.getId())) {
             UiTheme.showMessageDialog(this, "不能禁用当前登录账号");
@@ -302,18 +340,19 @@ public class UserPanel extends JPanel {
         boolean disabling = target.getStatus() != null && target.getStatus() == SysUser.STATUS_ENABLED;
         int newStatus = disabling ? SysUser.STATUS_DISABLED : SysUser.STATUS_ENABLED;
         if (userService.updateStatus(currentUser, target.getId(), newStatus)) {
-            // 成功后刷新当前分类，该行操作按钮的文字随新状态变化
-            loadCategory(currentKey);
+            // 成功后保持当前页刷新，该行操作按钮的文字随新状态变化
+            reloadKeepPage();
         } else {
-            // 失败统一提示并刷新表格，让显示回到数据库的真实状态
+            // 失败统一提示并保持当前页刷新，让显示回到数据库的真实状态
             UiTheme.showMessageDialog(this, "操作失败，请重试");
-            loadCategory(currentKey);
+            reloadKeepPage();
         }
     }
 
     // 重置密码：弹确认框（确定 / 取消），确定后把指定行用户密码重置为系统默认密码 123456
     private void resetPassword(int row) {
-        SysUser target = displayList.get(row);
+        // 表格行号加上页首偏移才是列表下标
+        SysUser target = displayList.get(toListIndex(row));
         // 确认框：确定返回 true，取消返回 false
         if (!UiTheme.showConfirmDialog(this, "确认要重置密码吗")) {
             return;
@@ -351,6 +390,8 @@ public class UserPanel extends JPanel {
         tableArea.setBorder(BorderFactory.createEmptyBorder(0, 16, 16, 16)); // 【可修改参数】表格区四周留白
         tableArea.add(tableWrap, BorderLayout.CENTER);
         panel.add(tableArea, BorderLayout.CENTER);
+        // 底部分页栏：上一页 / 当前页数/总页数 / 下一页 / 总数据条数
+        panel.add(pageBar, BorderLayout.SOUTH);
         return panel;
     }
 
@@ -370,8 +411,9 @@ public class UserPanel extends JPanel {
 
         public Component getTableCellEditorComponent(JTable t, Object value, boolean isSelected, int row, int column) {
             // 激活时同步按钮文字：正常 → "禁用"，已禁用 → "启用"
-            if (displayList != null && row >= 0 && row < displayList.size()) {
-                SysUser target = displayList.get(row);
+            if (displayList != null && row >= 0 && toListIndex(row) < displayList.size()) {
+                // 表格行号加上页首偏移才是列表下标
+                SysUser target = displayList.get(toListIndex(row));
                 button.setText(target.getStatus() != null && target.getStatus() == SysUser.STATUS_ENABLED ? "禁用" : "启用");
             }
             // 延迟到本次点击事件结束后再处理：先结束编辑状态，避免单元格停留在编辑模式
@@ -453,8 +495,8 @@ public class UserPanel extends JPanel {
         addButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 new UserDialog(SwingUtilities.getWindowAncestor(UserPanel.this), currentUser).setVisible(true);
-                // 关闭后刷新，让新用户立即出现在列表里
-                loadCategory(currentKey);
+                // 关闭后保持当前页刷新：新用户按编号排在末页，可通过页码按钮跳转查看
+                reloadKeepPage();
             }
         });
         panel.add(addButton, BorderLayout.EAST);

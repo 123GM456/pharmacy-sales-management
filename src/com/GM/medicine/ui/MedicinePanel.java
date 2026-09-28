@@ -52,8 +52,9 @@ import com.GM.medicine.service.MedicineService;
 
 /**
  * - 药品管理面板
- * - 顶部工具栏用"药品分类"下拉框切换数据视角（全部 / 正常 / 预警 / 过期），选择后立即刷新表格
- * - 表格展示药品并提供查询、新增、修改入口；数据获取全部通过 MedicineService 完成，本类不写 SQL；不提供删除功能
+ * - 顶部工具栏用"药品分类"下拉框切换数据视角（全部 / 正常 / 预警 / 过期 / 禁用），选择后立即刷新表格
+ * - 表格展示药品并提供查询、新增、修改、启用/停用入口；数据获取全部通过 MedicineService 完成，本类不写 SQL；不提供删除功能
+ * - 底部分页栏每页 50 条：滚轮翻页保留，另加上一页/下一页与页码跳转；切换分类或搜索回到第 1 页，行内操作保持当前页
  * - 查询按下拉框选中的类型（药品名称 / 药品类别）调用 Service 做数据库模糊查询；关键词为空时恢复当前分类视图
  */
 public class MedicinePanel extends JPanel {
@@ -61,22 +62,22 @@ public class MedicinePanel extends JPanel {
     // 药品业务对象：分类查询、新增、修改统一通过它调用
     private MedicineService medicineService = new MedicineService();
 
-    // 表格列名：只展示核心字段，批号 / 进价 / 预警库存 / 生产日期在编辑对话框中查看与维护
-    private final String[] columnNames = {"药品名称", "分类", "规格", "生产厂家", "销售价格", "库存", "有效期至", "状态", "操作"};
+    // 表格列名：文字状态列后一列是启用/停用按钮列（两个表头都叫"状态"，与用户管理一致）；批号 / 进价 / 预警库存 / 生产日期在编辑对话框中查看与维护
+    private final String[] columnNames = {"药品名称", "分类", "规格", "生产厂家", "销售价格", "库存", "有效期至", "状态", "状态", "操作"};
 
-    // 表格数据模型：只有最后一列"操作"可编辑（用于触发行内修改按钮）
+    // 表格数据模型：状态按钮列（第 8 列）与最后一列"操作"可编辑（用于触发行内按钮）
     private final DefaultTableModel tableModel = new DefaultTableModel(columnNames, 0) {
         public boolean isCellEditable(int row, int column) {
-            // 仅操作列可编辑；其他列点击不进入编辑状态
-            return column == columnNames.length - 1;
+            // 状态按钮列（第 8 列）和操作列（最后一列）可编辑，用于触发行内按钮；其他列点击不进入编辑状态
+            return column == 8 || column == columnNames.length - 1;
         }
     };
 
     // 药品表格：展示当前分类或查询结果的药品
     private JTable table = new JTable(tableModel);
 
-    // 药品分类下拉框：四个固定选项（全部 / 正常 / 预警 / 过期），选择后立即刷新表格
-    private JComboBox<String> categoryBox = UiTheme.createComboBox(new String[]{"全部药品", "正常药品", "预警药品", "过期药品"});
+    // 药品分类下拉框：五个固定选项（全部 / 正常 / 预警 / 过期 / 禁用），选择后立即刷新表格
+    private JComboBox<String> categoryBox = UiTheme.createComboBox(new String[]{"全部药品", "正常药品", "预警药品", "过期药品", "禁用药品"});
 
     // 查询类型下拉框：选"药品名称"按名称查、选"药品类别"按类别查，扁平风格由 UiTheme 工厂统一
     private JComboBox<String> searchTypeBox = UiTheme.createComboBox(new String[]{"药品名称", "药品类别"});
@@ -96,11 +97,21 @@ public class MedicinePanel extends JPanel {
     // 当前显示的药品列表（分类结果或查询结果，与表格行一一对应）
     private List<Medicine> displayList = new ArrayList<>();
 
-    // 当前选中的分类标识：all / available / warning / expired
+    // 当前选中的分类标识：all / available / warning / expired / disabled
     private String currentKey = "all";
 
-    // 操作列当前悬停的行号：-1 表示鼠标不在"修改"按钮上，用于驱动按钮悬停加深
+    // 底部分页栏：每页显示 50 条（可修改参数：每页条数 50），页码变化时回调 refreshTable 重绘当前页
+    private PageBar pageBar = new PageBar(50, new Runnable() {
+        public void run() {
+            refreshTable();
+        }
+    });
+
+    // 按钮列当前悬停的行号：-1 表示鼠标不在按钮列上，用于驱动按钮悬停加深
     private int hoverRow = -1;
+
+    // 按钮列当前悬停的列号：-1 表示鼠标不在按钮列上；行、列同时命中才加深对应按钮
+    private int hoverCol = -1;
 
     /**
      * 构造药品管理面板：组装工具栏与列表区，默认加载"全部药品"
@@ -129,27 +140,64 @@ public class MedicinePanel extends JPanel {
         if ("过期药品".equals(categoryText)) {
             return "expired";
         }
+        if ("禁用药品".equals(categoryText)) {
+            return "disabled";
+        }
         // 其余情况按"全部药品"处理
         return "all";
     }
 
-    // 按分类标识加载药品列表：key 与分类下拉框选项一一对应，分别调用对应 Service 方法
+    // 按分类标识加载药品列表并回到第 1 页：key 与分类下拉框选项一一对应
     private void loadCategory(String key) {
         // 记住当前分类：新增 / 修改成功后按它刷新，保持用户所在视角
         currentKey = key;
-        // 按标识调用对应的 Service 查询方法
-        if ("available".equals(key)) {
+        // 装载当前分类的数据
+        loadCategoryData();
+        // 数据变化后回到第 1 页：切换分类视为重新浏览
+        pageBar.setTotal(displayList.size());
+        refreshTable();
+    }
+
+    // 按当前分类标识调用对应 Service 方法装载数据（不刷新表格、不动页码）
+    private void loadCategoryData() {
+        if ("available".equals(currentKey)) {
             categoryList = medicineService.findAvailableMedicines();
-        } else if ("warning".equals(key)) {
+        } else if ("warning".equals(currentKey)) {
             categoryList = medicineService.findWarningMedicines();
-        } else if ("expired".equals(key)) {
+        } else if ("expired".equals(currentKey)) {
             categoryList = medicineService.findExpiredMedicines();
+        } else if ("disabled".equals(currentKey)) {
+            categoryList = medicineService.findDisabledMedicines();
         } else {
             categoryList = medicineService.findAll();
         }
         // 分类结果直接作为显示列表（查询已改为数据库模糊匹配，不再在分类结果内做内存过滤）
         displayList = categoryList;
+    }
+
+    // 重新装载当前分类数据并保持当前页码：行内按钮操作、对话框关闭后调用，避免页码跳回第 1 页
+    private void reloadKeepPage() {
+        // 装载当前分类的数据
+        loadCategoryData();
+        // 更新总条数并保持当前页（当前页越界时收敛到最后一页）
+        pageBar.setTotalKeepPage(displayList.size());
         refreshTable();
+    }
+
+    // 把表格行号换算成 displayList 下标：表格只显示当前页数据，需加上页首偏移
+    private int toListIndex(int row) {
+        return (pageBar.getCurrentPage() - 1) * pageBar.getPageSize() + row;
+    }
+
+    // 切换到预警药品分类：用户点击导航栏"库存预警"入口后由 MainFrame 调用，效果与手动下拉选择一致
+    public void selectWarningCategory() {
+        // 已在预警分类：下拉框不会再触发监听器，需手动按预警分类重载一次，保证表格显示完整预警列表
+        if ("预警药品".equals(categoryBox.getSelectedItem())) {
+            loadCategory("warning");
+            return;
+        }
+        // 不在预警分类：直接设置下拉框选中项，其监听器会自动完成"记分类 + 加载列表"
+        categoryBox.setSelectedItem("预警药品");
     }
 
     // 按下拉框选中的类型执行数据库模糊查询；关键词为空时恢复当前分类视图
@@ -167,17 +215,35 @@ public class MedicinePanel extends JPanel {
         } else {
             displayList = medicineService.findByName(keyword);
         }
+        // 禁用药品视角下只保留停用药品：模糊查询面向全库，不会自动带上当前分类的状态过滤
+        if ("disabled".equals(currentKey)) {
+            List<Medicine> disabledResults = new ArrayList<>();
+            for (Medicine medicine : displayList) {
+                // status 为 0 表示停用，只有停用药品才能留在禁用药品视角
+                if (medicine.getStatus() != null && medicine.getStatus() == 0) {
+                    disabledResults.add(medicine);
+                }
+            }
+            displayList = disabledResults;
+        }
+        // 搜索结果视为重新浏览：更新总条数并回到第 1 页
+        pageBar.setTotal(displayList.size());
         // 查询完成刷新表格
         refreshTable();
     }
 
-    // 用 displayList 的数据刷新表格行；日期格式化为 yyyy-MM-dd 文本
+    // 用 displayList 当前页的数据刷新表格行；日期格式化为 yyyy-MM-dd 文本
     private void refreshTable() {
         // 清空旧行后逐行填充
         tableModel.setRowCount(0);
         // 日期显示格式
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-        for (Medicine medicine : displayList) {
+        // 计算当前页的数据区间：[页首下标, min(页尾下标, 总条数))
+        int from = (pageBar.getCurrentPage() - 1) * pageBar.getPageSize();
+        int to = Math.min(from + pageBar.getPageSize(), displayList.size());
+        // 只填充当前页区间内的药品
+        for (int i = from; i < to; i++) {
+            Medicine medicine = displayList.get(i);
             tableModel.addRow(new Object[]{
                     medicine.getName(),
                     medicine.getCategory(),
@@ -189,11 +255,13 @@ public class MedicinePanel extends JPanel {
                     medicine.getExpiryDate() == null ? "" : medicine.getExpiryDate().format(formatter),
                     // 状态：1 = 正常（与 Service.checkMedicineAvailable 的判断一致）
                     medicine.getStatus() != null && medicine.getStatus() == 1 ? "正常" : "停售",
+                    // 状态按钮文字随行状态变化：在售显示"禁用"，停用显示"启用"（与用户管理一致）
+                    medicine.getStatus() != null && medicine.getStatus() == 1 ? "禁用" : "启用",
                     "修改"});
         }
     }
 
-    // 初始化表格外观与操作列按钮：渲染成按钮外观 + 点击触发修改对话框
+    // 初始化表格外观与两个按钮列：状态按钮（启用/停用）与操作按钮（修改）都渲染成按钮外观 + 点击触发
     private void initTable() {
         table.setFont(UiTheme.FONT_NORMAL); // 可修改参数：表格正文字体
         table.setRowHeight(30); // 可修改参数：表格行高（30）
@@ -214,24 +282,28 @@ public class MedicinePanel extends JPanel {
         table.getColumnModel().getColumn(5).setPreferredWidth(70); // 可修改参数：库存列宽（数量长短不定，留余量）
         table.getColumnModel().getColumn(6).setPreferredWidth(120); // 可修改参数：有效期至列宽（固定 10 字符日期 + 列头 4 字）
         table.getColumnModel().getColumn(7).setPreferredWidth(50); // 可修改参数：状态列宽（最长"正常/停售"2 字）
-        table.getColumnModel().getColumn(8).setPreferredWidth(70); // 可修改参数：操作列宽（"修改"按钮宽度）
+        table.getColumnModel().getColumn(8).setPreferredWidth(70); // 可修改参数：状态按钮列宽（"禁用/启用"按钮宽度）
+        table.getColumnModel().getColumn(9).setPreferredWidth(70); // 可修改参数：操作列宽（"修改"按钮宽度）
 
-        // 操作列悬停跟踪：表格单元格里的按钮不接收鼠标事件，悬停变色由表格代为跟踪行号后交给渲染器
+        // 按钮列悬停跟踪：表格单元格里的按钮不接收鼠标事件，悬停变色由表格代为跟踪行、列号后交给渲染器
         MouseAdapter hoverTracker = new MouseAdapter() {
             public void mouseMoved(MouseEvent e) {
-                // 鼠标所在列是操作列（第 8 列）时记录行号，否则记 -1 表示不在按钮上
+                // 鼠标所在列是状态按钮列（第 8 列）或操作列（第 9 列）时记录行、列号，否则记 -1 表示不在按钮上
                 int row = table.rowAtPoint(e.getPoint());
-                int newHoverRow = (table.columnAtPoint(e.getPoint()) == 8) ? row : -1;
-                // 悬停行变化时重绘表格，渲染器会用新的悬停状态画按钮
-                if (newHoverRow != hoverRow) {
+                int col = table.columnAtPoint(e.getPoint());
+                int newHoverRow = (col == 8 || col == 9) ? row : -1;
+                // 悬停位置变化时重绘表格，渲染器会用新的悬停状态画按钮
+                if (newHoverRow != hoverRow || col != hoverCol) {
                     hoverRow = newHoverRow;
+                    hoverCol = col;
                     table.repaint();
                 }
             }
             public void mouseExited(MouseEvent e) {
-                // 鼠标移出表格时清除悬停行，按钮恢复原色
+                // 鼠标移出表格时清除悬停位置，按钮恢复原色
                 if (hoverRow != -1) {
                     hoverRow = -1;
+                    hoverCol = -1;
                     table.repaint();
                 }
             }
@@ -239,12 +311,28 @@ public class MedicinePanel extends JPanel {
         table.addMouseListener(hoverTracker);
         table.addMouseMotionListener(hoverTracker);
 
-        // 操作列渲染按钮：所有行的"修改"按钮共用同一个外观实例
-        JButton renderButton = createCellButton();
+        // 状态按钮列渲染：所有行共用同一个外观实例，文字由每行的数据（"禁用"/"启用"）决定
+        JButton statusRenderButton = createCellButton();
         table.getColumnModel().getColumn(8).setCellRenderer(new TableCellRenderer() {
             public Component getTableCellRendererComponent(JTable t, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                // 按钮文字随行状态变化：在售显示"禁用"，停用显示"启用"
+                statusRenderButton.setText((String) value);
+                // 鼠标悬停在当前行的状态按钮上时底色加深，与"修改"按钮悬停效果一致；移开后恢复主题绿
+                if (row == hoverRow && column == hoverCol) {
+                    statusRenderButton.setBackground(UiTheme.PRIMARY_DARK);
+                } else {
+                    statusRenderButton.setBackground(UiTheme.PRIMARY);
+                }
+                return statusRenderButton;
+            }
+        });
+
+        // 操作列渲染按钮：所有行的"修改"按钮共用同一个外观实例
+        JButton renderButton = createCellButton();
+        table.getColumnModel().getColumn(9).setCellRenderer(new TableCellRenderer() {
+            public Component getTableCellRendererComponent(JTable t, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
                 // 鼠标悬停在当前行的"修改"按钮上时底色加深，与"新增药品"按钮悬停效果一致；移开后恢复主题绿
-                if (row == hoverRow) {
+                if (row == hoverRow && column == hoverCol) {
                     renderButton.setBackground(UiTheme.PRIMARY_DARK);
                 } else {
                     renderButton.setBackground(UiTheme.PRIMARY);
@@ -253,8 +341,11 @@ public class MedicinePanel extends JPanel {
             }
         });
 
+        // 状态按钮列编辑器：点击单元格时切换该行药品的在售/停用状态（DefaultCellEditor 不支持按钮，需自行实现）
+        table.getColumnModel().getColumn(8).setCellEditor(new StatusButtonEditor());
+
         // 操作列编辑器：点击单元格时打开该行的修改对话框（DefaultCellEditor 不支持按钮，需自行实现）
-        table.getColumnModel().getColumn(8).setCellEditor(new EditButtonEditor());
+        table.getColumnModel().getColumn(9).setCellEditor(new EditButtonEditor());
     }
 
     // 操作列按钮编辑器：单击"修改"单元格时打开对应行的药品编辑对话框
@@ -279,6 +370,28 @@ public class MedicinePanel extends JPanel {
         }
     }
 
+    // 状态按钮列编辑器：单击"禁用/启用"单元格时切换该行药品的在售/停用状态
+    private class StatusButtonEditor extends AbstractCellEditor implements TableCellEditor {
+
+        // 编辑器外观：与渲染按钮一致的状态按钮
+        private JButton button = createCellButton();
+
+        public Component getTableCellEditorComponent(JTable t, Object value, boolean isSelected, int row, int column) {
+            // 延迟到本次点击事件结束后再处理：先结束编辑状态，避免单元格停留在编辑模式
+            SwingUtilities.invokeLater(new Runnable() {
+                public void run() {
+                    stopCellEditing();
+                    toggleStatus(row);
+                }
+            });
+            return button;
+        }
+
+        public Object getCellEditorValue() {
+            return "状态";
+        }
+    }
+
     // 创建表格内"修改"按钮：主题绿实心，与"新增药品"按钮同风格
     private JButton createCellButton() {
         JButton button = UiTheme.createFlatButton("修改", UiTheme.PRIMARY, UiTheme.WHITE);
@@ -287,14 +400,28 @@ public class MedicinePanel extends JPanel {
         return button;
     }
 
-    // 打开修改对话框：取出该行对应的药品回填；对话框关闭后刷新当前分类
+    // 打开修改对话框：取出该行对应的药品回填；对话框关闭后保持当前页刷新
     private void openEditDialog(int row) {
-        // displayList 与表格行一一对应
-        Medicine medicine = displayList.get(row);
+        // displayList 与表格行一一对应：表格行号加上页首偏移才是列表下标
+        Medicine medicine = displayList.get(toListIndex(row));
         // 传入该行药品，对话框按修改模式回填
         new MedicineDialog(SwingUtilities.getWindowAncestor(this), medicine).setVisible(true);
-        // 关闭后刷新，保证表格显示最新数据
-        loadCategory(currentKey);
+        // 关闭后保持当前页刷新，保证表格显示最新数据
+        reloadKeepPage();
+    }
+
+    // 切换药品在售/停用状态：在售(1)→停用(0)，停用(0)→在售(1)，成功后按当前分类刷新表格
+    private void toggleStatus(int row) {
+        // displayList 与表格行一一对应：表格行号加上页首偏移才是列表下标
+        Medicine medicine = displayList.get(toListIndex(row));
+        // 目标状态取当前状态的反值：1 在售 ↔ 0 停用
+        int targetStatus = (medicine.getStatus() != null && medicine.getStatus() == 1) ? 0 : 1;
+        if (medicineService.updateStatus(medicine.getId(), targetStatus)) {
+            // 保持当前页刷新：停用后该行从"正常药品"分类消失，重新启用后回到列表
+            reloadKeepPage();
+        } else {
+            UiTheme.showMessageDialog(this, "操作失败，请稍后重试");
+        }
     }
 
     // 创建右侧列表区：顶部工具栏 + 药品表格
@@ -322,6 +449,8 @@ public class MedicinePanel extends JPanel {
         tableArea.setBorder(BorderFactory.createEmptyBorder(0, 16, 16, 16)); // 可修改参数：表格区四周留白
         tableArea.add(tableWrap, BorderLayout.CENTER);
         panel.add(tableArea, BorderLayout.CENTER);
+        // 底部分页栏：上一页 / 当前页数/总页数 / 下一页 / 总数据条数
+        panel.add(pageBar, BorderLayout.SOUTH);
         return panel;
     }
 
@@ -374,8 +503,8 @@ public class MedicinePanel extends JPanel {
             public void actionPerformed(ActionEvent e) {
                 // medicine 传 null，对话框按新增模式处理
                 new MedicineDialog(SwingUtilities.getWindowAncestor(MedicinePanel.this), null).setVisible(true);
-                // 关闭后刷新，让新药品立即出现在列表里
-                loadCategory(currentKey);
+                // 关闭后保持当前页刷新：新药品按编号排在末页，可通过页码按钮跳转查看
+                reloadKeepPage();
             }
         });
         panel.add(addButton, BorderLayout.EAST);

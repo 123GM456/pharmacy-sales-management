@@ -181,10 +181,14 @@ public final class UiTheme {
         // 注册匿名 MouseAdapter：鼠标进入按钮区域时换悬停色，离开时恢复原色（复用 hoverColor）
         button.addMouseListener(new MouseAdapter() {
             public void mouseEntered(MouseEvent e) {
-                button.setBackground(hoverColor(background));
+                // 禁用状态下不响应悬停变色，保持置灰外观提示不可点击
+                if (button.isEnabled()) {
+                    button.setBackground(hoverColor(background));
+                }
             }
             public void mouseExited(MouseEvent e) {
-                button.setBackground(background);
+                // 离开时恢复原色；禁用状态恢复置灰浅色，避免退回主题绿误导为可点击
+                button.setBackground(button.isEnabled() ? background : BORDER);
             }
         });
         return button;

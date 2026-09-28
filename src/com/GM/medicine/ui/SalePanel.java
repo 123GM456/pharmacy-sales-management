@@ -47,7 +47,8 @@ import com.GM.medicine.service.SaleService;
  * - 选"自定义"弹出 SaleDate 输入开始/结束日期；查询按下拉框类型受当前时间范围过滤
  * - 右侧表格展示销售记录（含联表带出的药品信息）并提供查询、新增销售入口
  * - 数据获取全部通过 SaleService 完成，本类不写 SQL；销售记录不提供删除、修改功能
- * - 查询按下拉框选中的类型（药品名称 / 操作员）调用 Service 做数据库模糊查询；关键词为空时弹提示要求输入
+ * - 查询按下拉框选中的类型（药品名称 / 操作员）调用 Service 做数据库模糊查询；关键词为空时恢复当前范围完整列表
+ * - 底部分页栏每页 50 条：滚轮翻页保留，另加上一页/下一页与页码跳转；切换时间范围或搜索回到第 1 页，新增销售保持当前页
  */
 public class SalePanel extends JPanel {
 
@@ -103,6 +104,13 @@ public class SalePanel extends JPanel {
 
     // 当前选中的时间范围标识：all / today / week / month / custom，新增销售成功后按它刷新
     private String currentKey = "all";
+
+    // 底部分页栏：每页显示 50 条（可修改参数：每页条数 50），页码变化时回调 refreshTable 重绘当前页
+    private PageBar pageBar = new PageBar(50, new Runnable() {
+        public void run() {
+            refreshTable();
+        }
+    });
 
     /**
      * 构造销售管理面板：保存登录用户 + 组装时间范围栏与列表区，默认加载"全部销售"
@@ -160,7 +168,18 @@ public class SalePanel extends JPanel {
         currentKey = key;
         // 无关键词：只按时间范围过滤
         displayList = saleService.searchSales(key, "none", "", customStart, customEnd);
+        // 数据变化后回到第 1 页：切换时间范围视为重新浏览
+        pageBar.setTotal(displayList.size());
         // 加载完成刷新表格
+        refreshTable();
+    }
+
+    // 重新装载当前时间范围数据并保持当前页码：新增销售成功后调用，避免页码跳回第 1 页
+    private void reloadKeepPage() {
+        // 装载当前时间范围的数据（自定义区间已记录在 customStart / customEnd）
+        displayList = saleService.searchSales(currentKey, "none", "", customStart, customEnd);
+        // 更新总条数并保持当前页（当前页越界时收敛到最后一页）
+        pageBar.setTotalKeepPage(displayList.size());
         refreshTable();
     }
 
@@ -175,6 +194,8 @@ public class SalePanel extends JPanel {
         }
         // 按当前时间范围 + 查询类型组合查询（如"今日销售"+药品名称 = 只查今日内名称匹配的记录）
         displayList = saleService.searchSales(currentKey, typeKey(), keyword, customStart, customEnd);
+        // 搜索结果视为重新浏览：更新总条数并回到第 1 页
+        pageBar.setTotal(displayList.size());
         // 查询完成刷新表格
         refreshTable();
     }
@@ -197,6 +218,8 @@ public class SalePanel extends JPanel {
         currentKey = "custom";
         // 按自定义区间 + 当前查询类型/关键词立即查询
         displayList = saleService.searchSales("custom", typeKey(), searchField.getText().trim(), customStart, customEnd);
+        // 自定义区间视为重新浏览：更新总条数并回到第 1 页
+        pageBar.setTotal(displayList.size());
         refreshTable();
     }
 
@@ -218,7 +241,7 @@ public class SalePanel extends JPanel {
         return "全部销售";
     }
 
-    // 用 displayList 的数据刷新表格行；销售时间格式化为 yyyy-MM-dd HH:mm:ss 文本
+    // 用 displayList 当前页的数据刷新表格行；销售时间格式化为 yyyy-MM-dd HH:mm:ss 文本
     private void refreshTable() {
         // 清空旧行后逐行填充
         tableModel.setRowCount(0);
@@ -228,7 +251,12 @@ public class SalePanel extends JPanel {
         if (displayList == null) {
             return;
         }
-        for (Sale sale : displayList) {
+        // 计算当前页的数据区间：[页首下标, min(页尾下标, 总条数))
+        int from = (pageBar.getCurrentPage() - 1) * pageBar.getPageSize();
+        int to = Math.min(from + pageBar.getPageSize(), displayList.size());
+        // 只填充当前页区间内的销售记录
+        for (int i = from; i < to; i++) {
+            Sale sale = displayList.get(i);
             tableModel.addRow(new Object[]{
                     sale.getId(),
                     // 药品名称、类别、规格、厂家、操作员姓名由 DAO 联表直接带出，无需在界面二次查询
@@ -296,6 +324,8 @@ public class SalePanel extends JPanel {
         tableArea.setBorder(BorderFactory.createEmptyBorder(0, 16, 16, 16)); // 【可修改参数】表格区四周留白
         tableArea.add(tableWrap, BorderLayout.CENTER);
         panel.add(tableArea, BorderLayout.CENTER);
+        // 底部分页栏：上一页 / 当前页数/总页数 / 下一页 / 总数据条数
+        panel.add(pageBar, BorderLayout.SOUTH);
         return panel;
     }
 
@@ -359,8 +389,8 @@ public class SalePanel extends JPanel {
             public void actionPerformed(ActionEvent e) {
                 // 传入当前登录用户：对话框保存时把它作为销售记录的操作员
                 new SaleDialog(SwingUtilities.getWindowAncestor(SalePanel.this), currentUser).setVisible(true);
-                // 关闭后刷新，让新销售记录立即出现在列表里
-                loadCategory(currentKey);
+                // 关闭后保持当前页刷新：新销售记录按编号排在末页，可通过页码按钮跳转查看
+                reloadKeepPage();
             }
         });
         panel.add(addButton, BorderLayout.EAST);

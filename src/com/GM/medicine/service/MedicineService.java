@@ -162,6 +162,29 @@ public class MedicineService {
         return result;
     }
 
+    /**
+     * 按编号更新药品状态（药品管理页"状态"按钮用）
+     * - 状态语义：1 在售，0 停用；停用后选药弹窗与可用药品查询都不再包含该药品
+     * - 只更新 status 单列，不覆盖其他字段
+     *
+     * @param medicineId 药品编号
+     * @param status     目标状态：1 在售，0 停用
+     * @return 更新成功返回 true，失败返回 false
+     */
+    public boolean updateStatus(Integer medicineId, int status) {
+        if (medicineId == null) {
+            System.out.println("更新药品状态：药品编号不能为空");
+            return false;
+        }
+        boolean result = medicineDao.updateStatus(medicineId, status);
+        if (result) {
+            System.out.println("更新药品状态成功：编号 " + medicineId + " → " + (status == 1 ? "在售" : "停用"));
+        } else {
+            System.out.println("更新药品状态失败：数据库更新失败");
+        }
+        return result;
+    }
+
     public Medicine findById(Integer id) {
         if (id == null) {
             System.out.println("查询药品：药品编号不能为空");       
@@ -199,6 +222,16 @@ public class MedicineService {
             System.out.println("查询可用药品：共 " + availableMedicines.size() + " 条数据");
         }
         return availableMedicines;
+    }
+
+    public List<Medicine> findDisabledMedicines() {
+        List<Medicine> disabledMedicines = medicineDao.findDisabledMedicines();
+        if (disabledMedicines.isEmpty()) {
+            System.out.println("查询停用药品：当前没有停用药品");
+        } else {
+            System.out.println("查询停用药品：共 " + disabledMedicines.size() + " 条数据");
+        }
+        return disabledMedicines;
     }
 
     public List<Medicine> findWarningMedicines() {
