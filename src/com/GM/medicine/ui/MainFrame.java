@@ -38,8 +38,6 @@ import com.GM.medicine.pojo.entity.SysUser;
 import com.GM.medicine.ui.MedicinePanel;
 // 导入 SalePanel：销售管理模块面板（现有面板，直接复用）
 import com.GM.medicine.ui.SalePanel;
-// 导入 PasswordDialog：修改密码对话框（现有对话框，点击菜单时弹出复用）
-import com.GM.medicine.ui.PasswordDialog;
 
 /**
  * - 主窗口
@@ -153,7 +151,7 @@ public class MainFrame extends JFrame {
         return panel;
     }
 
-    // 创建左侧导航栏："系统菜单"小标题 + 页面切换按钮（用户管理仅管理员可见）+ 修改密码 + 底部退出登录
+    // 创建左侧导航栏："系统菜单"小标题 + 页面切换按钮（用户管理仅管理员可见）+ 底部退出登录
     private JPanel createNavPanel() {
         // 导航栏容器：BoxLayout 沿垂直方向从上往下排列
         JPanel panel = new JPanel();
@@ -208,19 +206,7 @@ public class MainFrame extends JFrame {
         panel.add(infoButton);
         panel.add(Box.createVerticalStrut(8)); // 可修改参数：菜单按钮之间的间距（8）
 
-        // ===== 修改密码：弹出现有对话框，不占内容区 =====
-        JButton passwordButton = createNavButton("修改密码");
-        passwordButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                // 修改密码：传入当前登录用户，对话框内部完成表单、校验与保存
-                PasswordDialog dialog = new PasswordDialog(currentUser, MainFrame.this);
-                dialog.setVisible(true);
-            }
-        });
-        panel.add(passwordButton);
-        panel.add(Box.createVerticalStrut(8)); // 可修改参数：菜单按钮之间的间距（8）
-
-        // ===== 用户管理：仅管理员可见（ROLE_ADMIN），放在修改密码下方，目前只预留占位页 =====
+        // ===== 用户管理：仅管理员可见（ROLE_ADMIN），放在个人信息下方，目前只预留占位页 =====
         if (currentUser.getRole() != null && currentUser.getRole() == SysUser.ROLE_ADMIN) {
             JButton userButton = createNavButton("用户管理");
             userButton.addActionListener(new ActionListener() {

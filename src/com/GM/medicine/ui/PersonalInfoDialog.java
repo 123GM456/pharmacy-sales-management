@@ -32,12 +32,12 @@ import com.GM.medicine.pojo.entity.SysUser;
 import com.GM.medicine.service.SysUserService;
 
 /**
- * - 个人信息修改弹窗（EditMyInfoDialog）：一次只修改一个字段
+ * - 个人信息修改弹窗（PersonalInfoDialog）：一次只修改一个字段
  * - editName 为 true 时修改姓名，false 时修改手机号；输入框预填当前值
  * - 点“确定”校验通过后调用 SysUserService.updateMyInfo 保存；点“取消”直接关闭，原数据不受影响
  * - 另一个未修改的字段传当前用户原值，保证 Service 两字段非空校验通过
  */
-public class EditMyInfoDialog extends JDialog {
+public class PersonalInfoDialog extends JDialog {
 
     // 用户业务对象：保存统一通过它调用
     private SysUserService userService = new SysUserService();
@@ -70,7 +70,7 @@ public class EditMyInfoDialog extends JDialog {
      * @param currentUser 当前登录用户
      * @param editName    true 修改姓名，false 修改手机号
      */
-    public EditMyInfoDialog(Window owner, SysUser currentUser, boolean editName) {
+    public PersonalInfoDialog(Window owner, SysUser currentUser, boolean editName) {
         super(owner);
         // 保存当前用户：保存时取编号与未修改字段的当前值
         this.currentUser = currentUser;

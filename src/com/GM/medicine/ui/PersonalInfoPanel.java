@@ -2,6 +2,8 @@ package com.GM.medicine.ui;
 
 // 导入 BorderLayout：卡片占满面板内容区组织
 import java.awt.BorderLayout;
+// 导入 FlowLayout：卡片底部"修改密码"按钮居中排列
+import java.awt.FlowLayout;
 // 导入 Font：个人信息展示字体（比全局普通字体大一号）
 import java.awt.Font;
 // 导入 GridBagConstraints：配合 GridBagLayout 控制信息行位置与对齐
@@ -31,7 +33,8 @@ import com.GM.medicine.pojo.entity.SysUser;
  * - 个人信息面板
  * - 只读展示当前登录用户的个人信息：用户名、姓名、手机号、角色、账号状态
  * - 姓名与手机号旁有"修改"按钮，点击弹出修改弹窗，在弹窗内保存成功后本页与顶栏同步刷新
- * - 本面板不直接调 Service 保存（保存在修改弹窗内完成），只负责展示与打开弹窗
+ * - 卡片底部有"修改密码"按钮（主题绿实心），点击弹出修改密码弹窗
+ * - 本面板不直接调 Service 保存（保存在各弹窗内完成），只负责展示与打开弹窗
  */
 public class PersonalInfoPanel extends JPanel {
 
@@ -64,6 +67,9 @@ public class PersonalInfoPanel extends JPanel {
 
     // 手机号旁的修改按钮：弹出修改手机号弹窗
     private JButton editPhoneButton = createEditButton();
+
+    // 底部"修改密码"按钮：主题绿实心，与登录按钮同款，点击弹出修改密码弹窗
+    private JButton passwordButton = UiTheme.createRoundButton("修改密码", UiTheme.PRIMARY, UiTheme.WHITE);
 
     /**
      * 构造个人信息面板：保存登录用户与主窗口引用，组装界面并回填数据
@@ -102,6 +108,12 @@ public class PersonalInfoPanel extends JPanel {
         editPhoneButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 openEditDialog(false);
+            }
+        });
+        // 修改密码按钮监听：打开修改密码弹窗
+        passwordButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                openPasswordDialog();
             }
         });
         // 整体 BorderLayout：卡片占满整个内容区，四周留白与其他页面一致
@@ -199,7 +211,14 @@ public class PersonalInfoPanel extends JPanel {
         formPanel.add(filler, gbc);
         card.add(formPanel, BorderLayout.CENTER);
 
-        // 卡片占满内容区（修改在弹窗内完成，无底部按钮区）
+        // 卡片底部按钮区：居中放"修改密码"按钮，作为本页的主动作入口
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 16)); // 【可修改参数】底部按钮区留白（上下 16）
+        buttonPanel.setBackground(UiTheme.WHITE);
+        passwordButton.setPreferredSize(new java.awt.Dimension(120, 36)); // 【可修改参数】修改密码按钮大小（宽 120 / 高 36）
+        buttonPanel.add(passwordButton);
+        card.add(buttonPanel, BorderLayout.SOUTH);
+
+        // 卡片占满内容区（信息修改与修改密码都在弹窗内完成）
         add(card, BorderLayout.CENTER);
     }
 
@@ -246,7 +265,7 @@ public class PersonalInfoPanel extends JPanel {
      */
     private void openEditDialog(boolean editName) {
         // 模态弹窗：阻塞到确定或取消，取消直接关窗、不影响原数据
-        EditMyInfoDialog dialog = new EditMyInfoDialog(SwingUtilities.getWindowAncestor(this), currentUser, editName);
+        PersonalInfoDialog dialog = new PersonalInfoDialog(SwingUtilities.getWindowAncestor(this), currentUser, editName);
         dialog.setVisible(true);
         // 用户点了确定且保存成功：同步当前用户对象（与主窗口同一引用）并刷新显示
         if (dialog.isSaved()) {
@@ -259,5 +278,11 @@ public class PersonalInfoPanel extends JPanel {
             fillInfo();
             mainFrame.refreshUserBar();
         }
+    }
+
+    // 打开修改密码弹窗：复用现有 PasswordDialog，模态弹出，修改的是密码不影响本页信息
+    private void openPasswordDialog() {
+        PasswordDialog dialog = new PasswordDialog(currentUser, SwingUtilities.getWindowAncestor(this));
+        dialog.setVisible(true);
     }
 }
